@@ -1,94 +1,138 @@
-# Turborepo starter
+# Dark Side - Turborepo Monorepo
 
-This Turborepo starter is maintained by the Turborepo core team.
+A full-stack monorepo powered by Turborepo with NestJS backend and Next.js frontend.
 
-## Using this example
+## Project Structure
 
-Run the following command:
+This monorepo contains the following applications and packages:
 
-```sh
-npx create-turbo@latest
-```
+### Apps
 
-## What's inside?
+- `api`: a [NestJS](https://nestjs.com/) backend API server
+- `web`: a [Next.js](https://nextjs.org/) frontend application
 
-This Turborepo includes the following packages/apps:
+### Packages
 
-### Apps and Packages
-
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+- `@repo/ui`: a React component library shared across applications
+- `@repo/eslint-config`: ESLint configurations (includes `eslint-config-next` and `eslint-config-prettier`)
+- `@repo/typescript-config`: TypeScript configurations used throughout the monorepo
 
 Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
 
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
+### Tech Stack
 
 - [TypeScript](https://www.typescriptlang.org/) for static type checking
 - [ESLint](https://eslint.org/) for code linting
 - [Prettier](https://prettier.io) for code formatting
+- [NestJS](https://nestjs.com/) for the backend API
+- [Next.js](https://nextjs.org/) for the frontend application
 
-### Build
+## Getting Started
 
-To build all apps and packages, run the following command:
+### Prerequisites
 
-```
-cd my-turborepo
+Make sure you have Node.js installed (v18 or higher recommended).
 
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build
+### Installation
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
-```
+Install all dependencies from the root of the monorepo:
 
-You can build a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
-
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build --filter=docs
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
+```sh
+npm install
 ```
 
-### Develop
+## Running the Applications
 
-To develop all apps and packages, run the following command:
+### Run All Apps in Development Mode
 
-```
-cd my-turborepo
+To run both the backend and frontend simultaneously:
 
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
+```sh
+npm run dev
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+This will start:
 
+- **Backend API** (NestJS) at `http://localhost:3000`
+- **Frontend** (Next.js) at `http://localhost:3001`
+
+### Run Backend API Only
+
+To run only the NestJS backend:
+
+```sh
+cd apps/api
+npm run start:dev
 ```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
+The API will be available at `http://localhost:3000`.
+
+### Run Frontend Only
+
+To run only the Next.js frontend:
+
+```sh
+cd apps/web
+npm run dev
+```
+
+The frontend will be available at `http://localhost:3000`.
+
+### Using Turborepo Filters
+
+You can also use Turborepo to run specific apps:
+
+```sh
+# Run backend only
+npx turbo dev --filter=api
+
+# Run frontend only
 npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
 ```
 
-### Remote Caching
+## Building for Production
+
+### Build All Apps
+
+```sh
+npm run build
+```
+
+### Build Specific App
+
+```sh
+# Build backend
+npx turbo build --filter=api
+
+# Build frontend
+npx turbo build --filter=web
+```
+
+## Project Structure Details
+
+```
+dark-side/
+├── apps/
+│   ├── api/          # NestJS backend API
+│   │   ├── src/
+│   │   │   ├── main.ts
+│   │   │   ├── app.module.ts
+│   │   │   ├── app.controller.ts
+│   │   │   └── app.service.ts
+│   │   └── test/
+│   └── web/          # Next.js frontend
+│       ├── app/
+│       │   ├── layout.tsx
+│       │   └── page.tsx
+│       └── public/
+├── packages/
+│   ├── ui/           # Shared React components
+│   ├── eslint-config/
+│   └── typescript-config/
+└── turbo.json
+```
+
+## Remote Caching
 
 > [!TIP]
 > Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
