@@ -17,11 +17,17 @@ export class RedisService {
   }
 
   async setProgress(jobId: string, progress: number) {
-    await this.client.set(`pipeline:job:${jobId}:progress`, progress, { ex: 15 });
+    await this.client.set(`pipeline:job:${jobId}:progress`, progress, {
+      ex: 15,
+    });
   }
 
   async setDashboardCache(projectId: string, data: any) {
-    await this.client.set(`dashboard:project:${projectId}`, JSON.stringify(data), { ex: 120 });
+    await this.client.set(
+      `dashboard:project:${projectId}`,
+      JSON.stringify(data),
+      { ex: 120 },
+    );
   }
 
   async getStatus(runId: string) {
