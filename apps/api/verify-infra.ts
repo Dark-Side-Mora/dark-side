@@ -16,7 +16,9 @@ async function testConnections() {
     });
     await redis.set('test_connection', 'ok', { ex: 30 });
     const val = await redis.get('test_connection');
-    console.log(`✅ Redis: ${val === 'ok' ? 'Connected successfully' : 'Failed to retrieve value'}`);
+    console.log(
+      `✅ Redis: ${val === 'ok' ? 'Connected successfully' : 'Failed to retrieve value'}`,
+    );
   } catch (err) {
     console.error('❌ Redis Connection Failed:', err.message);
   }
@@ -27,7 +29,9 @@ async function testConnections() {
       node: process.env.OPENSEARCH_NODE!,
     });
     const info = await osClient.info();
-    console.log(`✅ OpenSearch: Connected to cluster "${info.body.cluster_name}" (Version: ${info.body.version.number})`);
+    console.log(
+      `✅ OpenSearch: Connected to cluster "${info.body.cluster_name}" (Version: ${info.body.version.number})`,
+    );
   } catch (err) {
     console.error('❌ OpenSearch Connection Failed:', err.message);
   }
