@@ -1,0 +1,93 @@
+# Send Workflow Details to Log Server
+
+Send runner ID and token to log server for processing.
+
+## Description
+
+This composite action sends workflow details (runner ID and GitHub token) to a remote log server. The server can optionally poll for workflow logs automatically when the workflow completes.
+
+## Inputs
+
+### `runner-id` (required)
+- **Description**: GitHub workflow run ID
+- **Required**: Yes
+- **Example**: `${{ github.run_id }}` (e.g., `20910276913`)
+
+### `github-token` (required)
+- **Description**: GitHub token for authentication (used by the server to fetch workflow logs)
+- **Required**: Yes
+- **Example**: `${{ secrets.GITHUB_TOKEN }}` or `${{ github.token }}`
+
+### `read-automatically` (optional)
+- **Description**: Automatically start reading logs when received by the server
+- **Required**: No
+- **Default**: `false`
+- **Possible values**: `true`, `false`
+
+## Usage
+
+### Using the published action
+
+Once published, you can use this action in any workflow:
+
+```yaml
+- name: Send workflow details
+  uses: Dark-Side-Mora/dark-side/.github/actions@v1
+  with:
+    runner-id: ${{ github.run_id }}
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+With automatic log reading:
+
+```yaml
+- name: Send workflow details with auto-read
+  uses: Dark-Side-Mora/dark-side/.github/actions@v1
+  with:
+    runner-id: ${{ github.run_id }}
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    read-automatically: 'true'
+```
+
+### Using locally (for development)
+
+When developing or testing within the same repository:
+
+```yaml
+- name: Send workflow details
+  uses: ./.github/actions
+  with:
+    runner-id: ${{ github.run_id }}
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+With automatic log reading:
+
+```yaml
+- name: Send workflow details with auto-read
+  uses: ./.github/actions
+  with:
+    runner-id: ${{ github.run_id }}
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    read-automatically: 'true'
+```
+
+## How it works
+
+1. The action collects the workflow details (runner ID and token)
+2. Sends a POST request to the configured log server
+3. If `read-automatically` is true, the server starts polling for workflow logs immediately
+4. Once the workflow completes, the server downloads and saves the logs as a ZIP file
+
+## Server Configuration
+
+The action sends data to: `129.154.46.198:3000/api/receive-workflow-details`
+
+## Requirements
+
+- `jq` must be available in the runner environment (pre-installed on GitHub-hosted runners)
+- `curl` must be available (pre-installed on GitHub-hosted runners)
+
+## Output
+
+The action outputs success/failure messages to the workflow logs but does not set any output variables.
