@@ -7,7 +7,12 @@ import { RedisService } from './infrastructure/redis.service';
 import { OpenSearchService } from './infrastructure/opensearch.service';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true })],
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: ['.env.local', '.env'],
+    }),
+  ],
   controllers: [AppController],
   providers: [AppService, PrismaService, RedisService, OpenSearchService],
 })
