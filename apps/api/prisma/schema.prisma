@@ -55,3 +55,75 @@ model SecurityFinding {
   remediation String?
   filePath    String?
 }
+
+model IntegrationConnection {
+  id                String                @id @default(uuid())
+  userId            String                // Supabase Auth User ID
+  provider          String                // 'github', 'jenkins', etc.
+  accessToken       String                // Encrypted token
+  refreshToken      String?               // Optional refresh token
+  expiresAt         DateTime?
+  metadata          Json?                 // Provider-specific metadata
+  status            String                @default("active") // active, expired, revoked
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  organizationAccess OrganizationAccess[]
+  githubInstallations GitHubInstallation[]
+
+  @@unique([userId, provider])
+  @@index([userId])
+}
+
+model OrganizationAccess {
+  id                     String               @id @default(uuid())
+  connectionId           String
+  connection             IntegrationConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  organizationId         String               // GitHub org ID
+  organizationName       String               // GitHub org name/login
+  repositoryPermissions  Json                 // Array of allowed repos: [{id, name, fullName}]
+  lastSyncedAt           DateTime             @default(now())
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+
+  @@unique([connectionId, organizationId])
+  @@index([connectionId])
+}
+
+model GitHubInstallation {
+  id                  String                @id @default(uuid())
+  userId              String                // Supabase Auth User ID
+  connectionId        String?
+  connection          IntegrationConnection? @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  installationId      String                @unique // GitHub App installation ID
+  accountId           String                // GitHub account/org ID
+  accountLogin        String                // GitHub account/org login
+  accountType         String                // 'User' or 'Organization'
+  targetType          String                // 'User' or 'Organization'
+  permissions         Json                  // Installation permissions
+  repositorySelection String                // 'all' or 'selected'
+  repositories        GitHubRepository[]
+  status              String                @default("active") // active, suspended, removed
+  installedAt         DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  @@index([userId])
+  @@index([installationId])
+  @@index([accountId])
+}
+
+model GitHubRepository {
+  id             String             @id @default(uuid())
+  installationId String
+  installation   GitHubInstallation @relation(fields: [installationId], references: [id], onDelete: Cascade)
+  repositoryId   String             // GitHub repo ID
+  name           String             // Repo name
+  fullName       String             // owner/repo
+  private        Boolean
+  permissions    Json?              // Specific permissions for this repo
+  addedAt        DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@unique([installationId, repositoryId])
+  @@index([installationId])
+  @@index([repositoryId])
+}
