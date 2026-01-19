@@ -55,3 +55,236 @@ model SecurityFinding {
   remediation String?
   filePath    String?
 }
+
+model IntegrationConnection {
+  id                String                @id @default(uuid())
+  userId            String                // Supabase Auth User ID
+  provider          String                // 'github', 'jenkins', etc.
+  accessToken       String                // Encrypted token
+  refreshToken      String?               // Optional refresh token
+  expiresAt         DateTime?
+  metadata          Json?                 // Provider-specific metadata
+  status            String                @default("active") // active, expired, revoked
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  organizationAccess OrganizationAccess[]
+  githubInstallations GitHubInstallation[]
+
+  @@unique([userId, provider])
+  @@index([userId])
+}
+
+model OrganizationAccess {
+  id                     String               @id @default(uuid())
+  connectionId           String
+  connection             IntegrationConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  organizationId         String               // GitHub org ID
+  organizationName       String               // GitHub org name/login
+  repositoryPermissions  Json                 // Array of allowed repos: [{id, name, fullName}]
+  lastSyncedAt           DateTime             @default(now())
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+
+  @@unique([connectionId, organizationId])
+  @@index([connectionId])
+}
+
+model GitHubInstallation {
+  id                  String                @id @default(uuid())
+  userId              String                // Supabase Auth User ID
+  connectionId        String?
+  connection          IntegrationConnection? @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  installationId      String                @unique // GitHub App installation ID
+  accountId           String                // GitHub account/org ID
+  accountLogin        String                // GitHub account/org login
+  accountType         String                // 'User' or 'Organization'
+  targetType          String                // 'User' or 'Organization'
+  permissions         Json                  // Installation permissions
+  repositorySelection String                // 'all' or 'selected'
+  repositories        GitHubRepository[]
+  status              String                @default("active") // active, suspended, removed
+  installedAt         DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  @@index([userId])
+  @@index([installationId])
+  @@index([accountId])
+}
+
+model GitHubRepository {
+  id             String             @id @default(uuid())
+  installationId String
+  installation   GitHubInstallation @relation(fields: [installationId], references: [id], onDelete: Cascade)
+  repositoryId   String             // GitHub repo ID
+  name           String             // Repo name
+  fullName       String             // owner/repo
+  private        Boolean
+  permissions    Json?              // Specific permissions for this repo
+  addedAt        DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@unique([installationId, repositoryId])
+  @@index([installationId])
+  @@index([repositoryId])
+}
+
+model WorkflowAnalysisCache {
+  id                    String             @id @default(uuid())
+  userId                String
+  repositoryId          String
+  workflowPath          String
+  workflowName          String
+  workflowFileContent   String             @db.Text
+  latestRunLogs         String             @db.Text
+  contentHash           String
+
+  analysisId            String             @unique
+  aiProvider            String
+  overallRisk           String
+  summary               String             @db.Text
+  issues                Json
+
+  analysisTimestamp     DateTime
+  cachedAt              DateTime           @default(now())
+  expiresAt             DateTime
+
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@unique([repositoryId, contentHash])
+  @@index([userId])
+  @@index([repositoryId])
+  @@index([workflowPath])
+  @@index([expiresAt])
+}
+
+// ============================================
+// Learning Platform Models
+// ============================================
+
+model Quiz {
+  id              String   @id @default(uuid())
+  title           String
+  description     String   @db.Text
+  category        String   // 'security', 'best-practices', 'optimization', etc.
+  difficulty      String   // 'beginner', 'intermediate', 'advanced'
+  type            String   // 'workflow-fix', 'multiple-choice', 'code-review'
+  totalQuestions  Int
+  estimatedTime   Int      // in minutes
+  tags            String[] // e.g., ['secrets', 'permissions', 'dependencies']
+
+  questions       QuizQuestion[]
+  userProgress    UserQuizProgress[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([category])
+  @@index([difficulty])
+  @@index([type])
+}
+
+model QuizQuestion {
+  id              String   @id @default(uuid())
+  quizId          String
+  quiz            Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  
+  order           Int      // Question number in quiz
+  title           String
+  description     String   @db.Text
+  type            String   // 'workflow-fix', 'multiple-choice', 'short-answer'
+  
+  // For workflow-fix type
+  vulnerableCode  String?  @db.Text // The vulnerable workflow YAML
+  codeLanguage    String?  // 'yaml', 'json', etc.
+  
+  // For multiple-choice type
+  choices         String[] // Array of choice options
+  
+  hint            String?  @db.Text
+  explanation     String   @db.Text // Explanation shown after answering
+  
+  answers         QuizAnswer[]
+  userAnswers     UserQuizAnswer[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([quizId, order])
+  @@index([quizId])
+}
+
+model QuizAnswer {
+  id              String   @id @default(uuid())
+  questionId      String
+  question        QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  // For workflow-fix type - the correct fixed code
+  correctCode     String?  @db.Text
+  
+  // For multiple-choice type - the correct choice index
+  correctChoice   Int?
+  
+  // For short-answer type - list of acceptable answers
+  acceptableAnswers String[] // Can have multiple valid answers
+  
+  points          Int      // Points awarded for correct answer (default 10)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([questionId])
+  @@index([questionId])
+}
+
+model UserQuizProgress {
+  id              String   @id @default(uuid())
+  userId          String   // Supabase Auth User ID
+  quizId          String
+  quiz            Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  
+  status          String   // 'not-started', 'in-progress', 'completed'
+  progress        Int      // Percentage or question number (0-100 or 0-totalQuestions)
+  marks           Int      // Total marks scored
+  totalMarks      Int      // Total possible marks
+  
+  currentQuestion Int?     // Current question being answered (for resuming)
+  attemptCount    Int      @default(0) // Number of times quiz was attempted
+  
+  startedAt       DateTime?
+  completedAt     DateTime?
+  
+  answers         UserQuizAnswer[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, quizId])
+  @@index([userId])
+  @@index([quizId])
+  @@index([status])
+}
+
+model UserQuizAnswer {
+  id              String   @id @default(uuid())
+  progressId      String
+  progress        UserQuizProgress @relation(fields: [progressId], references: [id], onDelete: Cascade)
+  
+  questionId      String
+  question        QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  // User's submitted answer
+  submittedCode   String?  @db.Text // For workflow-fix type
+  submittedChoice Int?             // For multiple-choice type
+  submittedText   String?  @db.Text // For short-answer type
+  
+  isCorrect       Boolean
+  pointsEarned    Int      @default(0)
+  
+  submittedAt     DateTime @default(now())
+
+  @@unique([progressId, questionId])
+  @@index([progressId])
+  @@index([questionId])
+}
+
