@@ -84,6 +84,8 @@ interface SecurityAnalysis {
   overallRisk: "critical" | "high" | "medium" | "low";
   summary: string;
   issues: SecurityIssue[];
+  cached?: boolean;
+  cacheHitAt?: string;
 }
 
 interface AnalysisResponse {
@@ -281,19 +283,12 @@ export default function PipelineTestPage() {
           <h2>3. Fetch & Analyze Pipeline</h2>
           <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
             <button
-              onClick={handleFetchPipelineData}
-              disabled={loading}
-              className={styles.button}
-            >
-              {loading ? "Fetching..." : "Fetch Workflows & Runs"}
-            </button>
-            <button
               onClick={handleAnalyzeSecurity}
               disabled={loading}
               className={styles.button}
               style={{ background: "#ff6b6b" }}
             >
-              {loading ? "Analyzing..." : "🔒 Analyze Security"}
+              {loading ? "Analyzing..." : "🔒 Fetch and Analyze Security"}
             </button>
           </div>
         </div>
@@ -498,6 +493,21 @@ export default function PipelineTestPage() {
               <p style={{ margin: 0, color: "#555" }}>
                 <strong>Analysis ID:</strong>{" "}
                 {securityAnalysis.analysisId.substring(0, 8)}...
+                {securityAnalysis.cached && (
+                  <span
+                    style={{
+                      marginLeft: "1rem",
+                      padding: "0.25rem 0.5rem",
+                      backgroundColor: "#e8f5e9",
+                      color: "#2e7d32",
+                      borderRadius: "4px",
+                      fontSize: "0.85rem",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    ✓ From Cache
+                  </span>
+                )}
               </p>
             </div>
             <p>

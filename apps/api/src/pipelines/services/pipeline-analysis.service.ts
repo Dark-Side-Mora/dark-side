@@ -4,6 +4,8 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { GeminiSecurityService } from '../../ai/gemini/gemini-security.service';
+import { WorkflowAnalysisCacheService } from './workflow-analysis-cache.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import {
   PipelineData,
   Workflow,
@@ -32,18 +34,25 @@ export interface WorkflowAnalysisResponse {
       suggestedFix?: string;
       category: string;
     }>;
+    cached?: boolean;
+    cacheHitAt?: string;
   };
 }
 
 @Injectable()
 export class PipelineAnalysisService {
-  constructor(private readonly geminiSecurityService: GeminiSecurityService) {}
+  constructor(
+    private readonly geminiSecurityService: GeminiSecurityService,
+    private readonly cacheService: WorkflowAnalysisCacheService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   /**
    * Analyze workflow with security recommendations
    */
   async analyzeWorkflowWithSecurity(
     pipelineData: PipelineData,
+    userId: string,
   ): Promise<WorkflowAnalysisResponse> {
     try {
       // Find the first workflow with recent runs
@@ -70,6 +79,32 @@ export class PipelineAnalysisService {
         );
       }
 
+      // Get repository ID for caching
+      const repositoryId = pipelineData.repository.id.toString();
+
+      // Check cache first
+      const cacheResult = await this.cacheService.getAnalysisFromCache(
+        userId,
+        repositoryId,
+        workflowContent,
+        latestLogs,
+      );
+
+      if (cacheResult.isCached && cacheResult.analysis) {
+        console.log(
+          'Returning cached analysis for workflow:',
+          workflowWithRuns.name,
+        );
+        return {
+          pipelineData,
+          securityAnalysis: {
+            ...cacheResult.analysis,
+            cached: true,
+            cacheHitAt: cacheResult.analysis.timestamp,
+          },
+        };
+      }
+
       // Call Gemini for security analysis
       const securityAnalysis =
         await this.geminiSecurityService.analyzeWorkflowSecurity(
@@ -77,6 +112,18 @@ export class PipelineAnalysisService {
           latestLogs,
           workflowWithRuns.name,
         );
+
+      // Save to cache for future use
+      await this.cacheService.saveAnalysisToCache(
+        userId,
+        repositoryId,
+        workflowWithRuns.path,
+        workflowWithRuns.name,
+        workflowContent,
+        latestLogs,
+        securityAnalysis,
+        'gemini',
+      );
 
       return {
         pipelineData,

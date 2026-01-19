@@ -127,3 +127,33 @@ model GitHubRepository {
   @@index([installationId])
   @@index([repositoryId])
 }
+
+model WorkflowAnalysisCache {
+  id                    String             @id @default(uuid())
+  userId                String
+  repositoryId          String
+  workflowPath          String
+  workflowName          String
+  workflowFileContent   String             @db.Text
+  latestRunLogs         String             @db.Text
+  contentHash           String
+
+  analysisId            String             @unique
+  aiProvider            String
+  overallRisk           String
+  summary               String             @db.Text
+  issues                Json
+
+  analysisTimestamp     DateTime
+  cachedAt              DateTime           @default(now())
+  expiresAt             DateTime
+
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@unique([repositoryId, contentHash])
+  @@index([userId])
+  @@index([repositoryId])
+  @@index([workflowPath])
+  @@index([expiresAt])
+}

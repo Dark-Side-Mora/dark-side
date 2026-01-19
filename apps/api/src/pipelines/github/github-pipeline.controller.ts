@@ -143,6 +143,7 @@ export class GithubPipelineController {
       const analysisResponse =
         await this.pipelineAnalysisService.analyzeWorkflowWithSecurity(
           pipelineData,
+          userId,
         );
 
       return {
