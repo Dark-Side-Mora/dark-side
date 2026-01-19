@@ -68,6 +68,29 @@ interface Job {
   logs?: string;
 }
 
+interface SecurityIssue {
+  severity: "critical" | "high" | "medium" | "low";
+  title: string;
+  description: string;
+  location?: string;
+  recommendation: string;
+  suggestedFix?: string;
+  category: string;
+}
+
+interface SecurityAnalysis {
+  analysisId: string;
+  timestamp: string;
+  overallRisk: "critical" | "high" | "medium" | "low";
+  summary: string;
+  issues: SecurityIssue[];
+}
+
+interface AnalysisResponse {
+  pipelineData: PipelineData;
+  securityAnalysis: SecurityAnalysis;
+}
+
 export default function PipelineTestPage() {
   const [userId, setUserId] = useState("test-user-123");
   const [loading, setLoading] = useState(false);
@@ -75,8 +98,11 @@ export default function PipelineTestPage() {
   const [installations, setInstallations] = useState<Installation[]>([]);
   const [selectedRepo, setSelectedRepo] = useState("");
   const [pipelineData, setPipelineData] = useState<PipelineData | null>(null);
+  const [securityAnalysis, setSecurityAnalysis] =
+    useState<SecurityAnalysis | null>(null);
   const [expandedRun, setExpandedRun] = useState<number | null>(null);
   const [expandedWorkflow, setExpandedWorkflow] = useState<number | null>(null);
+  const [expandedIssue, setExpandedIssue] = useState<number | null>(null);
 
   const handleFetchInstallations = async () => {
     setLoading(true);
@@ -112,6 +138,7 @@ export default function PipelineTestPage() {
     setLoading(true);
     setMessage("");
     setPipelineData(null);
+    setSecurityAnalysis(null);
 
     try {
       const encodedRepo = encodeURIComponent(selectedRepo);
@@ -125,6 +152,37 @@ export default function PipelineTestPage() {
         setMessage(`✅ ${data.message}`);
       } else {
         setMessage("No pipeline data found");
+      }
+    } catch (error) {
+      setMessage("Error: " + (error as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAnalyzeSecurity = async () => {
+    if (!selectedRepo) {
+      setMessage("Please select a repository first");
+      return;
+    }
+
+    setLoading(true);
+    setMessage("");
+    setSecurityAnalysis(null);
+
+    try {
+      const encodedRepo = encodeURIComponent(selectedRepo);
+      const response = await fetch(
+        `${API_URL}/pipelines/github/${encodedRepo}/analyze?userId=${userId}`,
+      );
+      const data = await response.json();
+
+      if (data.data) {
+        setPipelineData(data.data.pipelineData);
+        setSecurityAnalysis(data.data.securityAnalysis);
+        setMessage(`✅ ${data.message}`);
+      } else {
+        setMessage("Analysis failed");
       }
     } catch (error) {
       setMessage("Error: " + (error as Error).message);
@@ -148,6 +206,25 @@ export default function PipelineTestPage() {
 
   const toggleRunExpansion = (runId: number) => {
     setExpandedRun(expandedRun === runId ? null : runId);
+  };
+
+  const getRiskColor = (risk: string) => {
+    switch (risk) {
+      case "critical":
+        return "#dc3545";
+      case "high":
+        return "#fd7e14";
+      case "medium":
+        return "#ffc107";
+      case "low":
+        return "#28a745";
+      default:
+        return "#6c757d";
+    }
+  };
+
+  const getSeverityColor = (severity: string) => {
+    return getRiskColor(severity);
   };
 
   return (
@@ -201,14 +278,24 @@ export default function PipelineTestPage() {
 
       {selectedRepo && (
         <div className={styles.section}>
-          <h2>3. Fetch Pipeline Data</h2>
-          <button
-            onClick={handleFetchPipelineData}
-            disabled={loading}
-            className={styles.button}
-          >
-            {loading ? "Fetching..." : "Fetch Workflows & Runs"}
-          </button>
+          <h2>3. Fetch & Analyze Pipeline</h2>
+          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+            <button
+              onClick={handleFetchPipelineData}
+              disabled={loading}
+              className={styles.button}
+            >
+              {loading ? "Fetching..." : "Fetch Workflows & Runs"}
+            </button>
+            <button
+              onClick={handleAnalyzeSecurity}
+              disabled={loading}
+              className={styles.button}
+              style={{ background: "#ff6b6b" }}
+            >
+              {loading ? "Analyzing..." : "🔒 Analyze Security"}
+            </button>
+          </div>
         </div>
       )}
 
@@ -377,6 +464,164 @@ export default function PipelineTestPage() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {securityAnalysis && (
+        <div className={styles.section}>
+          <h2>🔐 Security Analysis Results</h2>
+          <div
+            className={styles.infoBox}
+            style={{
+              borderLeftColor: getRiskColor(securityAnalysis.overallRisk),
+            }}
+          >
+            <h3>Overall Risk Level</h3>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "1rem",
+                marginBottom: "1rem",
+              }}
+            >
+              <span
+                className={styles.statusBadge}
+                style={{
+                  backgroundColor: getRiskColor(securityAnalysis.overallRisk),
+                  padding: "0.5rem 1rem",
+                  fontSize: "1rem",
+                }}
+              >
+                {securityAnalysis.overallRisk.toUpperCase()}
+              </span>
+              <p style={{ margin: 0, color: "#555" }}>
+                <strong>Analysis ID:</strong>{" "}
+                {securityAnalysis.analysisId.substring(0, 8)}...
+              </p>
+            </div>
+            <p>
+              <strong>Summary:</strong> {securityAnalysis.summary}
+            </p>
+            <p style={{ fontSize: "0.85rem", color: "#666" }}>
+              Analyzed: {new Date(securityAnalysis.timestamp).toLocaleString()}
+            </p>
+          </div>
+
+          {securityAnalysis.issues.length > 0 ? (
+            <div style={{ marginTop: "1.5rem" }}>
+              <h3>Issues Found ({securityAnalysis.issues.length})</h3>
+              <div className={styles.issuesList}>
+                {securityAnalysis.issues.map((issue, index) => (
+                  <div
+                    key={index}
+                    className={styles.issueCard}
+                    style={{
+                      borderLeft: `4px solid ${getSeverityColor(issue.severity)}`,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        cursor: "pointer",
+                      }}
+                      onClick={() =>
+                        setExpandedIssue(expandedIssue === index ? null : index)
+                      }
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.75rem",
+                            marginBottom: "0.5rem",
+                          }}
+                        >
+                          <span
+                            className={styles.statusBadge}
+                            style={{
+                              backgroundColor: getSeverityColor(issue.severity),
+                            }}
+                          >
+                            {issue.severity.toUpperCase()}
+                          </span>
+                          <span
+                            className={styles.badge}
+                            style={{ background: "#e0e0e0", color: "#333" }}
+                          >
+                            {issue.category}
+                          </span>
+                        </div>
+                        <h4 style={{ margin: "0.5rem 0", color: "#333" }}>
+                          {issue.title}
+                        </h4>
+                      </div>
+                      <span style={{ fontSize: "1.2rem", marginLeft: "1rem" }}>
+                        {expandedIssue === index ? "▼" : "▶"}
+                      </span>
+                    </div>
+
+                    {expandedIssue === index && (
+                      <div
+                        style={{
+                          marginTop: "1rem",
+                          paddingTop: "1rem",
+                          borderTop: "1px solid #e0e0e0",
+                        }}
+                      >
+                        <p>
+                          <strong>Description:</strong> {issue.description}
+                        </p>
+                        {issue.location && (
+                          <p>
+                            <strong>Location:</strong>{" "}
+                            <code
+                              style={{
+                                background: "#f5f5f5",
+                                padding: "0.2rem 0.4rem",
+                              }}
+                            >
+                              {issue.location}
+                            </code>
+                          </p>
+                        )}
+                        <p>
+                          <strong>Recommendation:</strong>{" "}
+                          {issue.recommendation}
+                        </p>
+                        {issue.suggestedFix && (
+                          <details>
+                            <summary
+                              style={{
+                                color: "#0070f3",
+                                cursor: "pointer",
+                                fontWeight: 500,
+                              }}
+                            >
+                              💡 Suggested Fix
+                            </summary>
+                            <pre
+                              className={styles.workflowContent}
+                              style={{ marginTop: "0.5rem" }}
+                            >
+                              {issue.suggestedFix}
+                            </pre>
+                          </details>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className={styles.success} style={{ marginTop: "1rem" }}>
+              ✅ No security issues found! Your workflow looks good.
+            </div>
+          )}
         </div>
       )}
     </div>

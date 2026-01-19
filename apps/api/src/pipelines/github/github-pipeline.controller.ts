@@ -7,6 +7,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { GithubPipelineService } from './github-pipeline.service';
+import { PipelineAnalysisService } from '../services/pipeline-analysis.service';
 import {
   FetchPipelinesDto,
   FetchPipelinesParamsDto,
@@ -15,7 +16,10 @@ import { PipelineResponseDto } from './dto/pipeline-response.dto';
 
 @Controller('pipelines/github')
 export class GithubPipelineController {
-  constructor(private readonly githubPipelineService: GithubPipelineService) {}
+  constructor(
+    private readonly githubPipelineService: GithubPipelineService,
+    private readonly pipelineAnalysisService: PipelineAnalysisService,
+  ) {}
 
   /**
    * GET /pipelines/github/:repoIdentifier/data
@@ -104,6 +108,51 @@ export class GithubPipelineController {
     } catch (error) {
       throw new BadRequestException(
         `Failed to fetch workflows: ${error.message}`,
+      );
+    }
+  }
+
+  /**
+   * GET /pipelines/github/:repoIdentifier/analyze
+   * INTERNAL ENDPOINT: Fetch pipeline data and perform AI security analysis
+   * Returns pipeline data + security analysis from Gemini
+   *
+   * @param repoIdentifier - Repository in format "owner/repo"
+   * @param userId - User ID to authenticate with GitHub
+   */
+  @Get(':repoIdentifier/analyze')
+  async analyzePipelineSecurity(
+    @Param('repoIdentifier') repoIdentifier: string,
+    @Query('userId') userId: string,
+  ) {
+    try {
+      if (!userId) {
+        throw new BadRequestException('userId is required');
+      }
+
+      const decodedRepoIdentifier = decodeURIComponent(repoIdentifier);
+
+      // Fetch pipeline data
+      const pipelineData =
+        await this.githubPipelineService.fetchAllPipelineData(
+          userId,
+          decodedRepoIdentifier,
+        );
+
+      // Perform security analysis
+      const analysisResponse =
+        await this.pipelineAnalysisService.analyzeWorkflowWithSecurity(
+          pipelineData,
+        );
+
+      return {
+        statusCode: HttpStatus.OK,
+        message: 'Pipeline analyzed successfully',
+        data: analysisResponse,
+      };
+    } catch (error) {
+      throw new BadRequestException(
+        `Failed to analyze pipeline: ${error.message}`,
       );
     }
   }
