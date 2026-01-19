@@ -5,6 +5,8 @@ import { AppService } from './app.service';
 import { PrismaService } from './prisma/prisma.service';
 import { RedisService } from './infrastructure/redis.service';
 import { OpenSearchService } from './infrastructure/opensearch.service';
+import { IntegrationsModule } from './integrations/integrations.module';
+import { PipelinesModule } from './pipelines/pipelines.module';
 
 @Module({
   imports: [
@@ -12,6 +14,8 @@ import { OpenSearchService } from './infrastructure/opensearch.service';
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
     }),
+    IntegrationsModule,
+    PipelinesModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService, RedisService, OpenSearchService],

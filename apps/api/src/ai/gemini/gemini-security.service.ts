@@ -1,0 +1,163 @@
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import {
+  IAIProvider,
+  SecurityAnalysisResult,
+  SecurityIssue,
+} from '../interfaces/ai-provider.interface';
+import * as crypto from 'crypto';
+
+@Injectable()
+export class GeminiSecurityService implements IAIProvider {
+  private readonly genAI: GoogleGenerativeAI;
+  private readonly model;
+
+  constructor(private readonly configService: ConfigService) {
+    const apiKey = this.configService.get<string>('GEMINI_API_KEY');
+    if (!apiKey) {
+      console.warn('GEMINI_API_KEY not configured');
+    }
+    this.genAI = new GoogleGenerativeAI(apiKey || '');
+    this.model = this.genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash-lite',
+    });
+  }
+
+  /**
+   * Analyze workflow and logs for security issues
+   */
+  async analyzeWorkflowSecurity(
+    workflowContent: string,
+    latestLogs: string,
+    workflowName: string,
+  ): Promise<SecurityAnalysisResult> {
+    try {
+      const prompt = this.buildSecurityAnalysisPrompt(
+        workflowContent,
+        latestLogs,
+        workflowName,
+      );
+
+      const response = await this.model.generateContent(prompt);
+      const text = response.response.text();
+
+      // Parse JSON response from Gemini
+      const analysisData = this.parseGeminiResponse(text);
+
+      return {
+        analysisId: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        overallRisk: analysisData.overallRisk,
+        summary: analysisData.summary,
+        issues: analysisData.issues,
+      };
+    } catch (error) {
+      console.error('Error analyzing workflow security:', error);
+      throw new InternalServerErrorException(
+        `Failed to analyze workflow security: ${error.message}`,
+      );
+    }
+  }
+
+  /**
+   * Build the prompt for Gemini security analysis
+   */
+  private buildSecurityAnalysisPrompt(
+    workflowContent: string,
+    latestLogs: string,
+    workflowName: string,
+  ): string {
+    return `You are a GitHub Actions security expert. Analyze the following workflow file and execution logs for security vulnerabilities and best practice violations.
+
+WORKFLOW NAME: ${workflowName}
+
+WORKFLOW FILE (.yml):
+\`\`\`yaml
+${workflowContent}
+\`\`\`
+
+LATEST RUN LOGS:
+\`\`\`
+${latestLogs}
+\`\`\`
+
+Provide a detailed security analysis in the following JSON format ONLY (no markdown, just valid JSON):
+{
+  "overallRisk": "critical|high|medium|low",
+  "summary": "Brief summary of security posture",
+  "issues": [
+    {
+      "severity": "critical|high|medium|low",
+      "title": "Issue title",
+      "description": "Detailed description of the issue",
+      "location": "line X or step name",
+      "recommendation": "How to fix this issue",
+      "suggestedFix": "Example code or configuration fix",
+      "category": "secrets|permissions|dependencies|best-practices|credentials|code-quality"
+    }
+  ]
+}
+
+Focus on:
+1. Exposed secrets or credentials in logs
+2. Overly permissive permissions (read-all, write-all)
+3. Unvalidated external inputs
+4. Insecure dependency versions
+5. Missing SBOM or vulnerability scanning
+6. Hardcoded values
+7. Unencrypted artifact storage
+8. Missing branch protection rules references
+9. Insecure code practices
+
+Return ONLY valid JSON, no additional text.`;
+  }
+
+  /**
+   * Parse Gemini response and extract JSON
+   */
+  private parseGeminiResponse(text: string): {
+    overallRisk: 'critical' | 'high' | 'medium' | 'low';
+    summary: string;
+    issues: SecurityIssue[];
+  } {
+    try {
+      // Try to extract JSON from the response
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No JSON found in response');
+      }
+
+      const parsed = JSON.parse(jsonMatch[0]);
+
+      // Validate response structure
+      if (
+        !parsed.overallRisk ||
+        !parsed.summary ||
+        !Array.isArray(parsed.issues)
+      ) {
+        throw new Error('Invalid response structure');
+      }
+
+      return parsed;
+    } catch (error) {
+      console.error('Error parsing Gemini response:', error);
+      // Return default response if parsing fails
+      return {
+        overallRisk: 'medium',
+        summary:
+          'Unable to complete analysis. Please check the workflow manually.',
+        issues: [
+          {
+            severity: 'high',
+            title: 'Analysis Failed',
+            description: 'The AI analysis could not be completed properly.',
+            recommendation:
+              'Please review the workflow manually or contact support.',
+            category: 'system',
+          },
+        ],
+      };
+    }
+  }
+}
