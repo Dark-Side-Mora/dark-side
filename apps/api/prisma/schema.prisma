@@ -157,3 +157,134 @@ model WorkflowAnalysisCache {
   @@index([workflowPath])
   @@index([expiresAt])
 }
+
+// ============================================
+// Learning Platform Models
+// ============================================
+
+model Quiz {
+  id              String   @id @default(uuid())
+  title           String
+  description     String   @db.Text
+  category        String   // 'security', 'best-practices', 'optimization', etc.
+  difficulty      String   // 'beginner', 'intermediate', 'advanced'
+  type            String   // 'workflow-fix', 'multiple-choice', 'code-review'
+  totalQuestions  Int
+  estimatedTime   Int      // in minutes
+  tags            String[] // e.g., ['secrets', 'permissions', 'dependencies']
+
+  questions       QuizQuestion[]
+  userProgress    UserQuizProgress[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([category])
+  @@index([difficulty])
+  @@index([type])
+}
+
+model QuizQuestion {
+  id              String   @id @default(uuid())
+  quizId          String
+  quiz            Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  
+  order           Int      // Question number in quiz
+  title           String
+  description     String   @db.Text
+  type            String   // 'workflow-fix', 'multiple-choice', 'short-answer'
+  
+  // For workflow-fix type
+  vulnerableCode  String?  @db.Text // The vulnerable workflow YAML
+  codeLanguage    String?  // 'yaml', 'json', etc.
+  
+  // For multiple-choice type
+  choices         String[] // Array of choice options
+  
+  hint            String?  @db.Text
+  explanation     String   @db.Text // Explanation shown after answering
+  
+  answers         QuizAnswer[]
+  userAnswers     UserQuizAnswer[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([quizId, order])
+  @@index([quizId])
+}
+
+model QuizAnswer {
+  id              String   @id @default(uuid())
+  questionId      String
+  question        QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  // For workflow-fix type - the correct fixed code
+  correctCode     String?  @db.Text
+  
+  // For multiple-choice type - the correct choice index
+  correctChoice   Int?
+  
+  // For short-answer type - list of acceptable answers
+  acceptableAnswers String[] // Can have multiple valid answers
+  
+  points          Int      // Points awarded for correct answer (default 10)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([questionId])
+  @@index([questionId])
+}
+
+model UserQuizProgress {
+  id              String   @id @default(uuid())
+  userId          String   // Supabase Auth User ID
+  quizId          String
+  quiz            Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  
+  status          String   // 'not-started', 'in-progress', 'completed'
+  progress        Int      // Percentage or question number (0-100 or 0-totalQuestions)
+  marks           Int      // Total marks scored
+  totalMarks      Int      // Total possible marks
+  
+  currentQuestion Int?     // Current question being answered (for resuming)
+  attemptCount    Int      @default(0) // Number of times quiz was attempted
+  
+  startedAt       DateTime?
+  completedAt     DateTime?
+  
+  answers         UserQuizAnswer[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, quizId])
+  @@index([userId])
+  @@index([quizId])
+  @@index([status])
+}
+
+model UserQuizAnswer {
+  id              String   @id @default(uuid())
+  progressId      String
+  progress        UserQuizProgress @relation(fields: [progressId], references: [id], onDelete: Cascade)
+  
+  questionId      String
+  question        QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  // User's submitted answer
+  submittedCode   String?  @db.Text // For workflow-fix type
+  submittedChoice Int?             // For multiple-choice type
+  submittedText   String?  @db.Text // For short-answer type
+  
+  isCorrect       Boolean
+  pointsEarned    Int      @default(0)
+  
+  submittedAt     DateTime @default(now())
+
+  @@unique([progressId, questionId])
+  @@index([progressId])
+  @@index([questionId])
+}
+

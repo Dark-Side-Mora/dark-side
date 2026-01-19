@@ -7,6 +7,7 @@ import { RedisService } from './infrastructure/redis.service';
 import { OpenSearchService } from './infrastructure/opensearch.service';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { PipelinesModule } from './pipelines/pipelines.module';
+import { LearningModule } from './learning/learning.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { PipelinesModule } from './pipelines/pipelines.module';
     }),
     IntegrationsModule,
     PipelinesModule,
+    LearningModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService, RedisService, OpenSearchService],
