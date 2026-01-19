@@ -6,6 +6,7 @@ import { PrismaService } from './prisma/prisma.service';
 import { RedisService } from './infrastructure/redis.service';
 import { OpenSearchService } from './infrastructure/opensearch.service';
 import { IntegrationsModule } from './integrations/integrations.module';
+import { PipelinesModule } from './pipelines/pipelines.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { IntegrationsModule } from './integrations/integrations.module';
       envFilePath: ['.env.local', '.env'],
     }),
     IntegrationsModule,
+    PipelinesModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService, RedisService, OpenSearchService],

@@ -479,4 +479,42 @@ export class GithubAppService {
 
     return decrypted;
   }
+
+  /**
+   * Get installation token for a specific repository
+   * This is used by pipeline services to authenticate API calls
+   */
+  async getInstallationTokenForRepo(
+    userId: string,
+    repoFullName: string,
+  ): Promise<{ token: string; installationId: string }> {
+    // Find the installation that has access to this repository
+    const installation = await this.prisma.gitHubInstallation.findFirst({
+      where: {
+        userId,
+        status: 'active',
+        repositories: {
+          some: {
+            fullName: repoFullName,
+          },
+        },
+      },
+    });
+
+    if (!installation) {
+      throw new BadRequestException(
+        `No active GitHub App installation found for repository ${repoFullName}`,
+      );
+    }
+
+    // Get installation access token
+    const token = await this.getInstallationAccessToken(
+      installation.installationId,
+    );
+
+    return {
+      token,
+      installationId: installation.installationId,
+    };
+  }
 }
