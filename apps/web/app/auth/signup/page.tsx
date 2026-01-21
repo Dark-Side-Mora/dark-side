@@ -20,6 +20,7 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
+  const [emailConfirmationSent, setEmailConfirmationSent] = useState(false);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme");
@@ -54,7 +55,8 @@ export default function SignupPage() {
     if (error) {
       setAuthError(error.message);
     } else if (data) {
-      router.push("/");
+      console.log("Signup successful - confirmation email sent to:", email);
+      setEmailConfirmationSent(true);
     }
   };
 
@@ -294,177 +296,267 @@ export default function SignupPage() {
                 color: "var(--text-primary)",
               }}
             >
-              Create an account
+              {emailConfirmationSent
+                ? "Confirm your email"
+                : "Create an account"}
             </h1>
             <p style={{ color: "var(--text-secondary)", fontSize: "15px" }}>
-              Start your 14-day free trial. No credit card required.
+              {emailConfirmationSent
+                ? `We've sent a confirmation email to ${email}. Click the link to verify your account.`
+                : "Start your 14-day free trial. No credit card required."}
             </p>
           </div>
 
-          {authError && (
-            <div
-              style={{
-                padding: "12px",
-                marginBottom: "20px",
-                borderRadius: "8px",
-                backgroundColor: "rgba(239, 68, 68, 0.1)",
-                border: "1px solid rgba(239, 68, 68, 0.3)",
-                color: "#ef4444",
-                fontSize: "14px",
-              }}
-            >
-              {authError}
+          {emailConfirmationSent ? (
+            <div style={{ marginTop: "24px" }}>
+              <div
+                style={{
+                  padding: "16px",
+                  marginBottom: "20px",
+                  borderRadius: "8px",
+                  backgroundColor: "rgba(34, 197, 94, 0.1)",
+                  border: "1px solid rgba(34, 197, 94, 0.3)",
+                  color: "#22c55e",
+                  fontSize: "14px",
+                  lineHeight: "1.6",
+                }}
+              >
+                <strong>✓ Check your email!</strong>
+                <br />
+                We've sent a confirmation link to <strong>{email}</strong>.
+                <br />
+                Click it to activate your account and start using CI-Insight.
+              </div>
+
+              <div
+                style={{
+                  padding: "16px",
+                  marginBottom: "20px",
+                  borderRadius: "8px",
+                  backgroundColor: isDarkMode
+                    ? "rgba(59, 130, 246, 0.1)"
+                    : "rgba(59, 130, 246, 0.05)",
+                  border: "1px solid rgba(59, 130, 246, 0.3)",
+                  color: isDarkMode ? "#60a5fa" : "#3b82f6",
+                  fontSize: "14px",
+                  lineHeight: "1.6",
+                }}
+              >
+                <strong>Didn't receive the email?</strong>
+                <br />
+                Check your spam folder or{" "}
+                <button
+                  onClick={() => setEmailConfirmationSent(false)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "inherit",
+                    textDecoration: "underline",
+                    cursor: "pointer",
+                    fontWeight: 600,
+                  }}
+                >
+                  try signing up again
+                </button>
+              </div>
+
+              <p
+                style={{
+                  textAlign: "center",
+                  fontSize: "14px",
+                  color: "var(--text-secondary)",
+                  marginTop: "32px",
+                }}
+              >
+                Remember your password?{" "}
+                <a
+                  href="/auth/login"
+                  style={{ color: "var(--accent-cyan)", fontWeight: 600 }}
+                >
+                  Sign In
+                </a>
+              </p>
             </div>
+          ) : (
+            <>
+              {authError && (
+                <div
+                  style={{
+                    padding: "12px",
+                    marginBottom: "20px",
+                    borderRadius: "8px",
+                    backgroundColor: "rgba(239, 68, 68, 0.1)",
+                    border: "1px solid rgba(239, 68, 68, 0.3)",
+                    color: "#ef4444",
+                    fontSize: "14px",
+                  }}
+                >
+                  {authError}
+                </div>
+              )}
+
+              <form
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "20px",
+                }}
+                onSubmit={handleSignUp}
+              >
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "16px",
+                  }}
+                >
+                  <Input
+                    label="First Name"
+                    placeholder="John"
+                    type="text"
+                    required
+                    value={firstName}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setFirstName(e.target.value)
+                    }
+                  />
+                  <Input
+                    label="Last Name"
+                    placeholder="Doe"
+                    type="text"
+                    required
+                    value={lastName}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setLastName(e.target.value)
+                    }
+                  />
+                </div>
+                <Input
+                  label="Work Email"
+                  placeholder="name@company.com"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setEmail(e.target.value)
+                  }
+                />
+                <Input
+                  label="Password"
+                  placeholder="Create a password"
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setPassword(e.target.value)
+                  }
+                />
+
+                <Button
+                  style={{ width: "100%", height: "48px", fontSize: "16px" }}
+                  type="submit"
+                  disabled={loading}
+                >
+                  {loading ? "Creating account..." : "Create Account"}
+                </Button>
+              </form>
+
+              <div
+                style={{
+                  marginTop: "32px",
+                  position: "relative",
+                  textAlign: "center",
+                }}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "50%",
+                    left: 0,
+                    right: 0,
+                    height: "1px",
+                    backgroundColor: "var(--border)",
+                  }}
+                />
+                <span
+                  style={{
+                    position: "relative",
+                    backgroundColor: "var(--bg-card)",
+                    padding: "0 12px",
+                    fontSize: "12px",
+                    color: "var(--text-secondary)",
+                    textTransform: "uppercase",
+                    fontWeight: 600,
+                  }}
+                >
+                  Or register with
+                </span>
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "16px",
+                  marginTop: "24px",
+                }}
+              >
+                <Button
+                  variant="secondary"
+                  style={{ height: "44px" }}
+                  onClick={handleGitHubSignIn}
+                  type="button"
+                  disabled={loading}
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    style={{ marginRight: "8px" }}
+                  >
+                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.041-1.416-4.041-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                  </svg>
+                  GitHub
+                </Button>
+                <Button
+                  variant="secondary"
+                  style={{ height: "44px" }}
+                  onClick={handleGoogleSignIn}
+                  type="button"
+                  disabled={loading}
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    style={{ marginRight: "8px" }}
+                  >
+                    <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.908 3.152-1.928 4.176-1.228 1.216-3.144 2.344-6.392 2.344-5.148 0-9.144-4.128-9.144-9.272s3.996-9.272 9.144-9.272c2.788 0 4.884 1.1 6.332 2.476L20.66 2.38C18.664.484 15.936 0 12.48 0 5.692 0 0 5.692 0 12.48s5.692 12.48 12.48 12.48c3.704 0 6.504-1.224 8.712-3.52 2.28-2.28 3.016-5.492 3.016-8.08 0-.768-.06-1.504-.192-2.224l-11.536.004z" />
+                  </svg>
+                  Google
+                </Button>
+              </div>
+
+              <p
+                style={{
+                  textAlign: "center",
+                  fontSize: "14px",
+                  color: "var(--text-secondary)",
+                  marginTop: "32px",
+                }}
+              >
+                Already have an account?{" "}
+                <a
+                  href="/auth/login"
+                  style={{ color: "var(--accent-cyan)", fontWeight: 600 }}
+                >
+                  Sign In
+                </a>
+              </p>
+            </>
           )}
-
-          <form
-            style={{ display: "flex", flexDirection: "column", gap: "20px" }}
-            onSubmit={handleSignUp}
-          >
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "16px",
-              }}
-            >
-              <Input
-                label="First Name"
-                placeholder="John"
-                type="text"
-                required
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-              />
-              <Input
-                label="Last Name"
-                placeholder="Doe"
-                type="text"
-                required
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-              />
-            </div>
-            <Input
-              label="Work Email"
-              placeholder="name@company.com"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <Input
-              label="Password"
-              placeholder="Create a password"
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-
-            <Button
-              style={{ width: "100%", height: "48px", fontSize: "16px" }}
-              type="submit"
-              disabled={loading}
-            >
-              {loading ? "Creating account..." : "Create Account"}
-            </Button>
-          </form>
-
-          <div
-            style={{
-              marginTop: "32px",
-              position: "relative",
-              textAlign: "center",
-            }}
-          >
-            <div
-              style={{
-                position: "absolute",
-                top: "50%",
-                left: 0,
-                right: 0,
-                height: "1px",
-                backgroundColor: "var(--border)",
-              }}
-            />
-            <span
-              style={{
-                position: "relative",
-                backgroundColor: "var(--bg-card)",
-                padding: "0 12px",
-                fontSize: "12px",
-                color: "var(--text-secondary)",
-                textTransform: "uppercase",
-                fontWeight: 600,
-              }}
-            >
-              Or register with
-            </span>
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "16px",
-              marginTop: "24px",
-            }}
-          >
-            <Button
-              variant="secondary"
-              style={{ height: "44px" }}
-              onClick={handleGitHubSignIn}
-              type="button"
-              disabled={loading}
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                style={{ marginRight: "8px" }}
-              >
-                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.041-1.416-4.041-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-              </svg>
-              GitHub
-            </Button>
-            <Button
-              variant="secondary"
-              style={{ height: "44px" }}
-              onClick={handleGoogleSignIn}
-              type="button"
-              disabled={loading}
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                style={{ marginRight: "8px" }}
-              >
-                <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.908 3.152-1.928 4.176-1.228 1.216-3.144 2.344-6.392 2.344-5.148 0-9.144-4.128-9.144-9.272s3.996-9.272 9.144-9.272c2.788 0 4.884 1.1 6.332 2.476L20.66 2.38C18.664.484 15.936 0 12.48 0 5.692 0 0 5.692 0 12.48s5.692 12.48 12.48 12.48c3.704 0 6.504-1.224 8.712-3.52 2.28-2.28 3.016-5.492 3.016-8.08 0-.768-.06-1.504-.192-2.224l-11.536.004z" />
-              </svg>
-              Google
-            </Button>
-          </div>
-
-          <p
-            style={{
-              textAlign: "center",
-              fontSize: "14px",
-              color: "var(--text-secondary)",
-              marginTop: "32px",
-            }}
-          >
-            Already have an account?{" "}
-            <a
-              href="/auth/login"
-              style={{ color: "var(--accent-cyan)", fontWeight: 600 }}
-            >
-              Sign In
-            </a>
-          </p>
         </div>
       </div>
 

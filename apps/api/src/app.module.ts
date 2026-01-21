@@ -8,6 +8,7 @@ import { OpenSearchService } from './infrastructure/opensearch.service';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { PipelinesModule } from './pipelines/pipelines.module';
 import { LearningModule } from './learning/learning.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { LearningModule } from './learning/learning.module';
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
     }),
+    AuthModule,
     IntegrationsModule,
     PipelinesModule,
     LearningModule,
