@@ -48,13 +48,9 @@ export default function LoginPage() {
     if (error) {
       setAuthError(error.message);
     } else if (data?.session) {
-      // Session is automatically managed by AuthProvider
-      // Wait a moment for auth state to update
-      setTimeout(() => {
-        if (isAuthenticated) {
-          router.push("/");
-        }
-      }, 500);
+      // Session created successfully, redirect immediately
+      console.log("[Login] Sign in successful, redirecting to dashboard");
+      router.push("/");
     }
   };
 

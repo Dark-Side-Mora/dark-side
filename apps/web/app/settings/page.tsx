@@ -7,6 +7,7 @@ import { Card, Input } from "../../components/ui/Input";
 import { useAuthContext } from "../../lib/auth/auth-context";
 import { useAuth } from "../../lib/auth/useAuth";
 import { apiPatch, testAPIConnection } from "../../lib/api/client";
+import { useProfile } from "@/lib/auth/useProfile";
 
 interface UserProfile {
   id: string;
@@ -22,10 +23,8 @@ export default function SettingsPage() {
   const { user, isLoading: authLoading, isAuthenticated } = useAuthContext();
   const { getProfile, loading: profileLoading } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [fullName, setFullName] = useState("");
+  const { updateProfile, saving, error, success, setError, setSuccess } =
+    useProfile();
   const [bio, setBio] = useState("");
 
   useEffect(() => {
@@ -48,8 +47,11 @@ export default function SettingsPage() {
       }
 
       if (data) {
+        if (!data.fullName) {
+          data.fullName =
+            `${user?.user_metadata?.first_name || ""} ${user?.user_metadata?.last_name || ""}`.trim();
+        }
         setProfile(data);
-        setFullName(data.fullName || "");
         setBio(data.bio || "");
       }
     } catch (err) {
@@ -59,22 +61,16 @@ export default function SettingsPage() {
 
   const handleSaveChanges = async () => {
     try {
-      setSaving(true);
-      setError(null);
-      setSuccess(null);
-      const API_URL =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-      const updated = await apiPatch<UserProfile>(`${API_URL}/auth/profile`, {
-        fullName,
+      const updated = await updateProfile({
+        fullName: profile?.fullName,
         bio,
       });
       setProfile(updated);
+      setError(null);
       setSuccess("Profile updated successfully!");
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save changes");
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -175,11 +171,8 @@ export default function SettingsPage() {
               >
                 <Input
                   label="Full Name"
-                  value={fullName}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setFullName(e.target.value)
-                  }
-                  disabled={profileLoading}
+                  value={profile?.fullName || ""}
+                  disabled={true}
                   placeholder="Enter your full name"
                 />
                 <Input
@@ -208,7 +201,6 @@ export default function SettingsPage() {
                   variant="secondary"
                   disabled={saving || profileLoading}
                   onClick={() => {
-                    setFullName(profile?.fullName || "");
                     setBio(profile?.bio || "");
                     setError(null);
                   }}

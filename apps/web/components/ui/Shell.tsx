@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "./Button";
 import { useAuth } from "@/lib/auth/useAuth";
-import { AuthClient } from "@supabase/supabase-js";
+import { useAuthContext } from "@/lib/auth/auth-context";
 
 // --- Icons (Inline SVGs for Figma compatibility) ---
 const LogoIcon = () => (
@@ -223,8 +223,8 @@ export const Shell = ({
   // Initialize from localStorage if available, default to true (dark mode)
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { getProfile, loading: profileLoading, signOut } = useAuth();
-  const [userName, setUserName] = useState();
+  const { signOut } = useAuth();
+  const { user } = useAuthContext();
 
   useEffect(() => {
     // Check localStorage on mount
@@ -232,7 +232,6 @@ export const Shell = ({
     if (savedTheme === "light") {
       setIsDarkMode(false);
     }
-    fetchProfile();
   }, []);
 
   useEffect(() => {
@@ -245,20 +244,6 @@ export const Shell = ({
       localStorage.setItem("theme", "light");
     }
   }, [isDarkMode]);
-
-  const fetchProfile = async () => {
-    try {
-      const { data, error } = await getProfile();
-      if (error) {
-        console.error(error);
-      }
-      if (data) {
-        setUserName(data.fullName || "");
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
@@ -445,7 +430,10 @@ export const Shell = ({
                   color: "var(--text-primary)",
                 }}
               >
-                {userName}
+                {user?.user_metadata.first_name || ""}
+                {user?.user_metadata.last_name
+                  ? ` ${user?.user_metadata.last_name}`
+                  : ""}
               </div>
               <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
                 Pro License

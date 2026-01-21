@@ -88,37 +88,6 @@ export const useAuth = () => {
         setError(emailVerificationError);
         return { data: null, error: emailVerificationError };
       }
-
-      // After successful signin, sync profile with fullName from user metadata
-      if (data.session?.user) {
-        try {
-          const userMetadata = (data.session.user.user_metadata || {}) as any;
-          const firstName = userMetadata.first_name || "";
-          const lastName = userMetadata.last_name || "";
-          const fullName = `${firstName} ${lastName}`.trim();
-
-          if (fullName) {
-            await fetch(
-              `${process.env.NEXT_PUBLIC_API_URL}/auth/sync-profile`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${data.session.access_token}`,
-                },
-                body: JSON.stringify({
-                  fullName,
-                }),
-              },
-            );
-            console.log("Profile synced on first signin");
-          }
-        } catch (syncError) {
-          console.error("Failed to sync profile on signin:", syncError);
-          // Don't throw - signin was successful even if sync fails
-        }
-      }
-
       return { data, error: null };
     } catch (err) {
       const authError = err as AuthError;
