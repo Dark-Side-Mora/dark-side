@@ -8,6 +8,7 @@ import { useAuthContext } from "../../lib/auth/auth-context";
 import { useAuth } from "../../lib/auth/useAuth";
 import { apiPatch, testAPIConnection } from "../../lib/api/client";
 import { useProfile } from "@/lib/auth/useProfile";
+import { useOrganization, OrganizationMember } from "@/lib/organization/useOrganization";
 
 interface UserProfile {
   id: string;
@@ -26,6 +27,62 @@ export default function SettingsPage() {
   const { updateProfile, saving, error, success, setError, setSuccess } =
     useProfile();
   const [bio, setBio] = useState("");
+  const {
+    organizations,
+    loading: orgLoading,
+    error: orgError,
+    fetchOrganizations,
+    createOrganization,
+    updateOrganization,
+    deleteOrganization,
+    inviteMember,
+    searchUsers,
+    fetchSentRequests,
+    fetchIncomingRequests,
+    respondToRequest,
+    leaveOrganization,
+    fetchOrganizationMembers,
+  } = useOrganization() as ReturnType<typeof useOrganization> & {
+    fetchSentRequests: () => Promise<any[]>;
+    fetchIncomingRequests: () => Promise<any[]>;
+    fetchOrganizationMembers: (orgId: string) => Promise<OrganizationMember[]>;
+  };
+  // State for expanded orgs and their members
+  const [expandedOrgId, setExpandedOrgId] = useState<string | null>(null);
+  const [orgMembers, setOrgMembers] = useState<Record<string, OrganizationMember[]>>({});
+  const [orgMembersLoading, setOrgMembersLoading] = useState<Record<string, boolean>>({});
+  const [orgMembersError, setOrgMembersError] = useState<Record<string, string | null>>({});
+
+  const handleToggleOrgMembers = async (orgId: string) => {
+    if (expandedOrgId === orgId) {
+      setExpandedOrgId(null);
+      return;
+    }
+    setExpandedOrgId(orgId);
+    if (!orgMembers[orgId]) {
+      setOrgMembersLoading((prev) => ({ ...prev, [orgId]: true }));
+      setOrgMembersError((prev) => ({ ...prev, [orgId]: null }));
+      try {
+        const members = await fetchOrganizationMembers(orgId);
+        setOrgMembers((prev) => ({ ...prev, [orgId]: members }));
+      } catch (err: any) {
+        setOrgMembersError((prev) => ({ ...prev, [orgId]: err?.message || 'Failed to load members' }));
+      } finally {
+        setOrgMembersLoading((prev) => ({ ...prev, [orgId]: false }));
+      }
+    }
+  };
+
+  // State for pending invitations (organizations the user is invited to but not a member of)
+  const [pendingInvites, setPendingInvites] = useState<any[]>([]);
+  const [pendingLoading, setPendingLoading] = useState(false);
+  const [pendingError, setPendingError] = useState<string | null>(null);
+  const [showCreateOrg, setShowCreateOrg] = useState(false);
+  const [newOrgName, setNewOrgName] = useState("");
+  const [newOrgDomain, setNewOrgDomain] = useState("");
+  const [inviteOrgId, setInviteOrgId] = useState<string | null>(null);
+  const [inviteQuery, setInviteQuery] = useState("");
+  const [inviteResults, setInviteResults] = useState<any[]>([]);
 
   useEffect(() => {
     // Test API connection on mount
@@ -33,8 +90,28 @@ export default function SettingsPage() {
 
     if (!authLoading && isAuthenticated && user) {
       fetchProfile();
+      fetchOrganizations();
     }
+     
   }, [authLoading, isAuthenticated, user]);
+
+  // Fetch pending invitations only after organizations are loaded
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && user && !orgLoading) {
+      setPendingLoading(true);
+      setPendingError(null);
+      fetchIncomingRequests()
+        .then((all) => {
+          const orgIds = new Set((organizations || []).map((o) => o.id));
+          setPendingInvites(Array.isArray(all) ? all.filter((r) => !orgIds.has(r.organizationId)) : []);
+        })
+        .catch((err) => {
+          setPendingError(err instanceof Error ? err.message : "Failed to fetch invitations");
+        })
+        .finally(() => setPendingLoading(false));
+    }
+     
+  }, [authLoading, isAuthenticated, user, orgLoading]);
 
   const fetchProfile = async () => {
     try {
@@ -86,9 +163,9 @@ export default function SettingsPage() {
                 style={{
                   padding: "12px",
                   borderRadius: "8px",
-                  backgroundColor: "rgba(239, 68, 68, 0.1)",
-                  border: "1px solid rgba(239, 68, 68, 0.3)",
-                  color: "#ef4444",
+                  backgroundColor: "var(--error-bg)",
+                  border: "1px solid var(--error-border)",
+                  color: "var(--error-text)",
                   fontSize: "14px",
                 }}
               >
@@ -100,9 +177,9 @@ export default function SettingsPage() {
                 style={{
                   padding: "12px",
                   borderRadius: "8px",
-                  backgroundColor: "rgba(34, 197, 94, 0.1)",
-                  border: "1px solid rgba(34, 197, 94, 0.3)",
-                  color: "#22c55e",
+                  backgroundColor: "var(--success-bg)",
+                  border: "1px solid var(--success-border)",
+                  color: "var(--success-text)",
                   fontSize: "14px",
                 }}
               >
@@ -124,7 +201,7 @@ export default function SettingsPage() {
                     height: "80px",
                     borderRadius: "20px",
                     backgroundColor: "var(--accent-cyan)",
-                    color: "#000",
+                    color: "var(--accent-cyan-text)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -213,86 +290,276 @@ export default function SettingsPage() {
         );
       case "Organization":
         return (
-          <Card title="Organization Settings">
-            <div
-              style={{ display: "flex", flexDirection: "column", gap: "24px" }}
-            >
-              <Input label="Organization Name" defaultValue="Main Hub" />
-              <Input label="Domain" defaultValue="enterprise.com" />
-              <div>
-                <h4
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: 600,
-                    marginBottom: "12px",
-                  }}
-                >
-                  Active Members
-                </h4>
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "12px",
-                  }}
-                >
-                  {[
-                    {
-                      name: "John Doe",
-                      role: "Owner",
-                      email: "john@enterprise.com",
-                    },
-                    {
-                      name: "Jane Smith",
-                      role: "Admin",
-                      email: "jane@enterprise.com",
-                    },
-                    {
-                      name: "Mike Johnson",
-                      role: "Member",
-                      email: "mike@enterprise.com",
-                    },
-                  ].map((m) => (
+          <Card title="Your Organizations">
+            <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+              {orgError && (
+                <div style={{ color: "var(--error-text)", fontSize: 14 }}>{orgError}</div>
+              )}
+              {orgLoading ? (
+                <div>Loading organizations...</div>
+              ) : organizations.length === 0 ? (
+                <div style={{ color: "var(--text-secondary)" }}>You are not a member of any organizations.</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  {organizations.map((org) => (
                     <div
-                      key={m.email}
+                      key={org.id}
                       style={{
                         display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        padding: "12px",
-                        backgroundColor: "rgba(255,255,255,0.02)",
+                        flexDirection: "column",
+                        gap: 8,
+                        backgroundColor: "var(--card-bg)",
                         borderRadius: "8px",
                         border: "1px solid var(--border)",
+                        padding: "12px",
                       }}
                     >
-                      <div>
-                        <div style={{ fontSize: "14px", fontWeight: 600 }}>
-                          {m.name}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                        <div>
+                          <div style={{ fontSize: "14px", fontWeight: 600 }}>{org.name}</div>
+                          <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>{org.domain}</div>
                         </div>
-                        <div
-                          style={{
-                            fontSize: "12px",
-                            color: "var(--text-secondary)",
-                          }}
-                        >
-                          {m.email}
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span
+                            style={{
+                              fontSize: "11px",
+                              fontWeight: 700,
+                              textTransform: "uppercase",
+                              color: "var(--accent-cyan)",
+                            }}
+                          >
+                            {org.role}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handleToggleOrgMembers(org.id)}
+                          >
+                            {expandedOrgId === org.id ? "Hide Members" : "Show Members"}
+                          </Button>
+                          {org.role === "owner" && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={async () => {
+                                  const newName = prompt("Enter new organization name", org.name);
+                                  if (newName && newName !== org.name) {
+                                    try {
+                                      await updateOrganization(org.id, newName);
+                                      await fetchOrganizations();
+                                    } catch { }
+                                  }
+                                }}
+                              >
+                                Rename
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="danger"
+                                onClick={async () => {
+                                  if (confirm(`Delete organization '${org.name}'? This cannot be undone.`)) {
+                                    try {
+                                      await deleteOrganization(org.id);
+                                      await fetchOrganizations();
+                                    } catch { }
+                                  }
+                                }}
+                              >
+                                Delete
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => setInviteOrgId(org.id)}
+                              >
+                                Invite
+                              </Button>
+                            </>
+                          )}
+                          {org.role !== "owner" && (
+                            <Button
+                              size="sm"
+                              variant="danger"
+                              onClick={async () => {
+                                if (confirm(`Leave organization '${org.name}'?`)) {
+                                  try {
+                                    await leaveOrganization(org.id);
+                                  } catch (e) {
+                                    alert("Failed to leave organization");
+                                  }
+                                }
+                              }}
+                            >
+                              Leave
+                            </Button>
+                          )}
                         </div>
                       </div>
-                      <span
-                        style={{
-                          fontSize: "11px",
-                          fontWeight: 700,
-                          textTransform: "uppercase",
-                          color: "var(--accent-cyan)",
-                        }}
-                      >
-                        {m.role}
-                      </span>
+                      {/* Member List Section */}
+                      {expandedOrgId === org.id && (
+                        <div style={{ marginTop: 12, background: "var(--dropdown-bg)", border: "1px solid var(--border)", borderRadius: 6, padding: 12 }}>
+                          {orgMembersLoading[org.id] ? (
+                            <div>Loading members...</div>
+                          ) : orgMembersError[org.id] ? (
+                            <div style={{ color: 'var(--error-text)' }}>{orgMembersError[org.id]}</div>
+                          ) : (orgMembers[org.id]?.length ?? 0) > 0 ? (
+                            <table style={{ width: '100%', fontSize: 13 }}>
+                              <thead>
+                                <tr style={{ color: 'var(--accent-cyan)' }}>
+                                  <th style={{ textAlign: 'left', padding: 4 }}>Name</th>
+                                  <th style={{ textAlign: 'left', padding: 4 }}>Email</th>
+                                  <th style={{ textAlign: 'left', padding: 4 }}>Role</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(orgMembers[org.id] ?? []).map((m) => (
+                                  <tr key={m.userId}>
+                                    <td style={{ padding: 4 }}>{m.fullName || '-'}</td>
+                                    <td style={{ padding: 4 }}>{m.email}</td>
+                                    <td style={{ padding: 4 }}>{m.role}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          ) : (
+                            <div style={{ color: 'var(--text-secondary)' }}>No members found.</div>
+                          )}
+                        </div>
+                      )}
+                      {/* Sent/Incoming Requests Section for this org */}
+                      <OrganizationRequestsSection
+                        organization={org}
+                        fetchSentRequests={fetchSentRequests}
+                        fetchIncomingRequests={fetchIncomingRequests}
+                        respondToRequest={respondToRequest}
+                      />
                     </div>
                   ))}
                 </div>
+              )}
+              {/* Pending Invitations for organizations the user is not a member of */}
+              {pendingLoading ? (
+                <div>Loading invitations...</div>
+              ) : pendingInvites.length > 0 && (
+                <div style={{ marginTop: 24 }}>
+                  <div style={{ fontWeight: 700, color: 'var(--accent-cyan)', marginBottom: 8 }}>Pending Invitations</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {pendingInvites.map((invite) => (
+                      <div key={invite.organizationId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: 8, padding: 12 }}>
+                        <span style={{ color: 'var(--text-primary)', fontSize: 14 }}>{invite.organizationName}</span>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <Button size="sm" variant="secondary" onClick={async () => {
+                            try {
+                              await respondToRequest(invite.organizationId, true);
+                              setPendingInvites((prev) => prev.filter((i) => i.organizationId !== invite.organizationId));
+                              await fetchOrganizations();
+                            } catch { }
+                          }}>Accept</Button>
+                          <Button size="sm" variant="danger" onClick={async () => {
+                            try {
+                              await respondToRequest(invite.organizationId, false);
+                              setPendingInvites((prev) => prev.filter((i) => i.organizationId !== invite.organizationId));
+                            } catch { }
+                          }}>Reject</Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* Invite Member Inline Search */}
+              {inviteOrgId && (
+                <div style={{ marginTop: 24, background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 8, padding: 24, maxWidth: 400 }}>
+                  <h3 style={{ marginBottom: 12, color: "var(--accent-cyan)", fontWeight: 700 }}>Invite Member</h3>
+                  <Input
+                    label="Search by email"
+                    value={inviteQuery}
+                    onChange={async (e: React.ChangeEvent<HTMLInputElement>) => {
+                      setInviteQuery(e.target.value);
+                      if (e.target.value.length >= 3) {
+                        const org = organizations.find(o => o.id === inviteOrgId);
+                        if (org) {
+                          const users = await searchUsers(org.domain, e.target.value, org.id);
+                          setInviteResults(users as any[]);
+                        }
+                      } else {
+                        setInviteResults([]);
+                      }
+                    }}
+                    style={{ marginBottom: 8 }}
+                    autoFocus
+                  />
+                  <div style={{ background: "var(--dropdown-bg)", border: "1px solid var(--border)", borderRadius: 6, marginTop: 4, minHeight: 36, boxShadow: "var(--dropdown-shadow)" }}>
+                    {inviteQuery.length < 3 ? (
+                      <div style={{ color: "var(--text-secondary)", padding: 8, fontSize: 13 }}>Type at least 3 characters to search users.</div>
+                    ) : inviteResults.length === 0 ? (
+                      <div style={{ color: "var(--error-text)", padding: 8, fontSize: 13 }}>No users found.</div>
+                    ) : (
+                      inviteResults.map(u => (
+                        <div key={u.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: 8, borderBottom: "1px solid var(--border-light)" }}>
+                          <span style={{ color: "var(--text-primary)", fontSize: 14 }}>
+                            {u.fullName ? <>{u.fullName} <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>({u.email})</span></> : u.email}
+                          </span>
+                          <Button
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                await inviteMember(inviteOrgId, u.id, async () => {
+                                  // Refresh sent requests for this org if visible
+                                  // Find the OrganizationRequestsSection for this org and trigger refresh
+                                  // (We rely on useEffect in OrganizationRequestsSection to refetch on prop change)
+                                });
+                                setInviteOrgId(null);
+                                setInviteQuery("");
+                                setInviteResults([]);
+                              } catch { }
+                            }}
+                          >
+                            Invite
+                          </Button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
+                    <Button variant="secondary" onClick={() => { setInviteOrgId(null); setInviteQuery(""); setInviteResults([]); }}>
+                      Close
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <div style={{ marginTop: "32px" }}>
+                <Button style={{ width: "fit-content" }} onClick={() => setShowCreateOrg((v) => !v)}>
+                  {showCreateOrg ? "Cancel" : "Create Organization"}
+                </Button>
               </div>
-              <Button style={{ width: "fit-content" }}>Invite Member</Button>
+              {showCreateOrg && (
+                <div style={{ marginTop: 24, background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 8, padding: 24, maxWidth: 400 }}>
+                  <h3 style={{ marginBottom: 16 }}>Create Organization</h3>
+                  <Input label="Name" value={newOrgName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewOrgName(e.target.value)} />
+                  <Input label="Domain" value={newOrgDomain} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewOrgDomain(e.target.value)} />
+                  <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
+                    <Button
+                      onClick={async () => {
+                        try {
+                          await createOrganization(newOrgName, newOrgDomain);
+                          setShowCreateOrg(false);
+                          setNewOrgName("");
+                          setNewOrgDomain("");
+                          await fetchOrganizations();
+                        } catch { }
+                      }}
+                      disabled={!newOrgName || !newOrgDomain}
+                    >
+                      Create
+                    </Button>
+                    <Button variant="secondary" onClick={() => setShowCreateOrg(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </Card>
         );
@@ -657,6 +924,99 @@ export default function SettingsPage() {
           </Card>
         </div>
       </Shell>
+    );
+  }
+}
+
+// --- Add this component at the bottom of the file ---
+
+type Organization = {
+  id: string;
+  name: string;
+  domain: string;
+  role: string;
+};
+
+function OrganizationRequestsSection({
+  organization,
+  fetchSentRequests,
+  fetchIncomingRequests,
+  respondToRequest,
+}: {
+  organization: Organization;
+  fetchSentRequests: () => Promise<any[]>;
+  fetchIncomingRequests: () => Promise<any[]>;
+  respondToRequest: (organizationId: string, accept: boolean) => void;
+}) {
+  const [sentRequests, setSentRequests] = React.useState<any[]>([]);
+  const [incomingRequests, setIncomingRequests] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    setLoading(true);
+    if (organization.role === 'owner') {
+      fetchSentRequests().then((all) => {
+        setSentRequests((all || []).filter((r) => r.organizationId === organization.id));
+      }).finally(() => setLoading(false));
+    } else {
+      fetchIncomingRequests().then((all) => {
+        setIncomingRequests((all || []).filter((r) => r.organizationId === organization.id));
+      }).finally(() => setLoading(false));
+    }
+     
+  }, [organization.id, organization.role]);
+
+  if (loading) return <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Loading requests...</div>;
+
+  if (organization.role === 'owner') {
+    return (
+      <div style={{ marginTop: 12 }}>
+        <div style={{ fontWeight: 600, color: 'var(--accent-cyan)', marginBottom: 8 }}>Sent Invitations</div>
+        {sentRequests.length === 0 ? (
+          <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>No invitations sent.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {sentRequests.map((req) => {
+              let statusLabel = 'Pending';
+              let statusColor = 'var(--text-secondary)';
+              if (req.status === 'accepted') {
+                statusLabel = 'Accepted';
+                statusColor = 'var(--success)';
+              } else if (req.status === 'rejected') {
+                statusLabel = 'Rejected';
+                statusColor = 'var(--error-text)';
+              }
+              return (
+                <div key={req.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: 6, padding: 8 }}>
+                  <span style={{ color: 'var(--text-primary)', fontSize: 14 }}>{req.userFullName || req.userEmail}</span>
+                  <span style={{ color: statusColor, fontSize: 13 }}>{statusLabel}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  } else {
+    return (
+      <div style={{ marginTop: 12 }}>
+        {incomingRequests.length === 0 ? (
+          <div></div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontWeight: 600, color: 'var(--accent-cyan)', marginBottom: 8 }}>Incoming Invitations</div>
+            {incomingRequests.map((req) => (
+              <div key={req.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: 6, padding: 8 }}>
+                <span style={{ color: 'var(--text-primary)', fontSize: 14 }}>{req.organizationName}</span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <Button size="sm" variant="secondary" onClick={() => respondToRequest(req.organizationId, true)}>Accept</Button>
+                  <Button size="sm" variant="danger" onClick={() => respondToRequest(req.organizationId, false)}>Reject</Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     );
   }
 }

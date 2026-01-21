@@ -9,6 +9,7 @@ import { IntegrationsModule } from './integrations/integrations.module';
 import { PipelinesModule } from './pipelines/pipelines.module';
 import { LearningModule } from './learning/learning.module';
 import { AuthModule } from './auth/auth.module';
+import { OrganizationModule } from './organization/organization.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { AuthModule } from './auth/auth.module';
     IntegrationsModule,
     PipelinesModule,
     LearningModule,
+    OrganizationModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService, RedisService, OpenSearchService],

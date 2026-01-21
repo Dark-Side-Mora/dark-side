@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Button } from "./Button";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useAuthContext } from "@/lib/auth/auth-context";
+import { useOrganization } from "@/lib/organization/useOrganization";
 
 // --- Icons (Inline SVGs for Figma compatibility) ---
 const LogoIcon = () => (
@@ -225,6 +226,18 @@ export const Shell = ({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { signOut } = useAuth();
   const { user } = useAuthContext();
+  const {
+    organizations,
+    currentOrgId,
+    selectOrganization,
+    fetchOrganizations,
+    loading: orgLoading,
+  } = useOrganization();
+
+  useEffect(() => {
+    fetchOrganizations();
+     
+  }, []);
 
   useEffect(() => {
     // Check localStorage on mount
@@ -486,24 +499,42 @@ export const Shell = ({
             >
               <IconMenu />
             </button>
-            <span
-              style={{ fontSize: "14px", color: "var(--text-secondary)" }}
-              className="desktop-only"
-            >
+            <span style={{ fontSize: "14px", color: "var(--text-secondary)" }} className="desktop-only">
               Organization:
             </span>
-            <span style={{ fontSize: "14px", fontWeight: 600 }}>Main Hub</span>
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="var(--text-secondary)"
-              strokeWidth="2"
-              className="desktop-only"
-            >
-              <path d="m6 9 6 6 6-6" />
-            </svg>
+            {orgLoading ? (
+              <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>Loading...</span>
+            ) : organizations.length === 0 ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => (window.location.href = "/settings")}
+              >
+                No Organization
+              </Button>
+            ) : (
+              <select
+                value={currentOrgId || organizations[0]?.id}
+                onChange={e => selectOrganization(e.target.value)}
+                style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  padding: "4px 12px",
+                  borderRadius: 8,
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-sidebar)",
+                  color: "var(--text-primary)",
+                  minWidth: 120,
+                  cursor: "pointer",
+                }}
+              >
+                {organizations.map(org => (
+                  <option key={org.id} value={org.id}>
+                    {org.name} ({org.role})
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
             <button

@@ -16,6 +16,9 @@ model User {
   avatar     String?
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  organizationMemberships OrganizationMembership[]
+  membershipRequests MembershipRequest[]
 }
 
 model Project {
@@ -298,3 +301,47 @@ model UserQuizAnswer {
   @@index([questionId])
 }
 
+// ============================================
+// Organization Management Models
+// ============================================
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  domain    String
+  members   OrganizationMembership[]
+  requests  MembershipRequest[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([domain])
+}
+
+model OrganizationMembership {
+  id             String   @id @default(uuid())
+  organizationId String
+  userId         String
+  role           String   // 'owner', 'admin', 'member'
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+}
+
+model MembershipRequest {
+  id             String   @id @default(uuid())
+  organizationId String
+  userId         String
+  status         String   // 'pending', 'accepted', 'rejected'
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+}
