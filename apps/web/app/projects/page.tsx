@@ -20,6 +20,7 @@ export default function ProjectsPage() {
   const { authorizeGithubApp, fetchInstallations } = useGithubApp();
   const [projects, setProjects] = useState<any[]>([]);
   const [showAddProject, setShowAddProject] = useState(false);
+  const [showPlatformChoice, setShowPlatformChoice] = useState(false);
   const [githubAuthorized, setGithubAuthorized] = useState<boolean | null>(
     null,
   );
@@ -197,7 +198,7 @@ export default function ProjectsPage() {
           ))
         )}
 
-        {showAddProject ? (
+        {showAddProject && !showPlatformChoice ? (
           <div
             style={{
               border: "1px solid var(--border)",
@@ -257,7 +258,7 @@ export default function ProjectsPage() {
                   setGithubLoading(true);
                   setGithubMessage("");
                   try {
-                    const data = (await fetchInstallations()) as any;
+                    const data = (await fetchInstallations(true)) as any;
                     if (data.data?.installations) {
                       setInstallations(data.data.installations);
                       setGithubMessage(
@@ -452,27 +453,6 @@ export default function ProjectsPage() {
                       </ul>
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
-                      {/* <button
-                        onClick={async () => {
-                          setGithubLoading(true);
-                          setGithubMessage("");
-                          try {
-                            const data = await syncInstallation(installation.id) as any;
-                            setGithubMessage(`✅ Synced ${data.data?.synced} repositories`);
-                            // Refresh installations
-                            const d = await fetchInstallations() as any;
-                            setInstallations(d.data?.installations || []);
-                          } catch (error) {
-                            setGithubMessage('Error: ' + (error as Error).message);
-                          } finally {
-                            setGithubLoading(false);
-                          }
-                        }}
-                        style={{ padding: '6px 14px', borderRadius: 6, background: 'var(--accent-cyan)', color: '#fff', fontWeight: 600, border: 'none', cursor: 'pointer' }}
-                        disabled={githubLoading}
-                      >
-                        🔄 Sync Repositories
-                      </button> */}
                       <button
                         onClick={() =>
                           window.open(
@@ -556,7 +536,10 @@ export default function ProjectsPage() {
               </div>
             )}
             <button
-              onClick={() => setShowAddProject(false)}
+              onClick={() => {
+                setShowAddProject(false);
+                setShowPlatformChoice(false);
+              }}
               style={{
                 marginTop: 16,
                 padding: "8px 18px",
@@ -571,10 +554,11 @@ export default function ProjectsPage() {
               Close
             </button>
           </div>
-        ) : (
+        ) : !showAddProject && !showPlatformChoice ? (
           <div
             onClick={async () => {
-              setShowAddProject(true);
+              setShowAddProject(false);
+              setShowPlatformChoice(true);
               setGithubAuthorized(null);
               try {
                 const result = (await checkGithubAppAuthorized()) as any;
@@ -606,6 +590,49 @@ export default function ProjectsPage() {
             <span style={{ fontSize: "14px", fontWeight: 600 }}>
               Add New Project
             </span>
+          </div>
+        ) : (
+          <div>
+            {/*Add the platform selection UI here */}
+            <h2 style={{ fontSize: "22px", fontWeight: 700, marginBottom: 16 }}>
+              Select Platform
+            </h2>
+            <div style={{ display: "flex", gap: "16px" }}>
+              <button
+                onClick={() => {
+                  setShowPlatformChoice(false);
+                  setShowAddProject(true);
+                }}
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: "8px",
+                  background: "var(--accent-cyan)",
+                  color: "#fff",
+                  fontWeight: 700,
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                GitHub
+              </button>
+              <button
+                onClick={() => {
+                  // Future platform options can be handled here
+                }}
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: "8px",
+                  background: "var(--border)",
+                  color: "var(--text-primary)",
+                  fontWeight: 700,
+                  border: "none",
+                  cursor: "not-allowed",
+                }}
+                disabled
+              >
+                Other Platforms (Coming Soon)
+              </button>
+            </div>
           </div>
         )}
       </div>

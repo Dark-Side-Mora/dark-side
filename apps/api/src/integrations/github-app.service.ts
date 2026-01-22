@@ -306,7 +306,7 @@ export class GithubAppService {
   /**
    * Get user's installations with repositories
    */
-  async getUserInstallations(userId: string) {
+  async getUserInstallations(userId: string, includeRepos: boolean = false) {
     // get installation ids
     const installations_prev = await this.prisma.gitHubInstallation.findMany({
       where: { userId },
@@ -335,12 +335,14 @@ export class GithubAppService {
     });
 
     // filter the repos with projects
-    for (const inst of installations) {
-      inst.repositories = inst.repositories.filter((repo) =>
-        projects.some(
-          (proj) => proj.repositoryUrl === repo.fullName.toString(),
-        ),
-      );
+    if (!includeRepos) {
+      for (const inst of installations) {
+        inst.repositories = inst.repositories.filter((repo) =>
+          projects.some(
+            (proj) => proj.repositoryUrl === repo.fullName.toString(),
+          ),
+        );
+      }
     }
 
     return installations;

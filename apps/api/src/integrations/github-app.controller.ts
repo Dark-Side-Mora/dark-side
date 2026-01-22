@@ -129,9 +129,14 @@ export class GithubAppController {
    */
   @UseGuards(JwtAuthGuard)
   @Get('installations')
-  async getInstallations(@Req() req) {
+  async getInstallations(
+    @Req() req,
+    @Param() params,
+    @Query('include_repos') includeRepos: string,
+  ) {
     const installations = await this.githubAppService.getUserInstallations(
       req.user.id,
+      includeRepos === 'true',
     );
 
     return {

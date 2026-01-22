@@ -16,8 +16,10 @@ export const useGithubApp = () => {
   };
 
   // Fetch installations
-  const fetchInstallations = async () => {
-    return apiGet(`${API_URL}/integrations/github-app/installations`);
+  const fetchInstallations = async (include_repos: boolean = false) => {
+    return apiGet(
+      `${API_URL}/integrations/github-app/installations?include_repos=${include_repos}`,
+    );
   };
 
   // Sync installation
