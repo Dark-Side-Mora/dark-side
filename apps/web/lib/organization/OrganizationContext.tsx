@@ -1,5 +1,6 @@
 "use client";
 import React, { createContext, useContext, useState, ReactNode } from "react";
+import { ProjectContextProvider } from "../project/ProjectContext";
 
 interface OrganizationContextType {
   currentOrgId: string | null;
@@ -15,7 +16,7 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <OrganizationContext.Provider value={{ currentOrgId, setCurrentOrgId }}>
-      {children}
+      <ProjectContextProvider>{children}</ProjectContextProvider>
     </OrganizationContext.Provider>
   );
 };

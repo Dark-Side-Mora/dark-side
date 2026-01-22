@@ -14,6 +14,13 @@ export class JwtMiddleware implements NestMiddleware {
 
   async use(req: Request, res: Response, next: NextFunction) {
     const authHeader = req.headers.authorization;
+    const body = req.body;
+
+    console.log('[JwtMiddleware] Incoming request:', {
+      method: req.method,
+      url: req.url,
+      body: body,
+    });
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       console.log('[JwtMiddleware] No token provided');

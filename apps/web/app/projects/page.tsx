@@ -1,21 +1,17 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Shell } from "../../components/ui/Shell";
 import { Card } from "../../components/ui/Input";
 import { useOrganization } from "../../lib/organization/useOrganization";
 import { useProject } from "../../lib/project/useProject";
 import { useGithubApp } from "@/lib/project/useGithubApp";
-import { time } from "console";
+import { useProjectContext } from "@/lib/project/ProjectContext";
 
 export default function ProjectsPage() {
-  const {
-    currentOrgId,
-    organizations,
-    selectOrganization,
-    loading: orgLoading,
-    fetchOrganizations,
-  } = useOrganization();
+  const router = useRouter();
+  const { currentOrgId, loading: orgLoading } = useOrganization();
   const {
     fetchProjects,
     loading: projectLoading,
@@ -34,6 +30,8 @@ export default function ProjectsPage() {
   const [selectedRepos, setSelectedRepos] = useState<{
     [key: number]: Set<string>;
   }>({});
+  // FIX: Move useProjectContext hook call to top level
+  const { setCurrentProjectId, setRepositoryUrl } = useProjectContext();
 
   useEffect(() => {
     if (currentOrgId) {
@@ -42,6 +40,21 @@ export default function ProjectsPage() {
       console.log("No current organization selected.");
     }
   }, [currentOrgId]);
+
+  if (!currentOrgId) {
+    return (
+      <Shell activePage="Projects">
+        <div style={{ marginBottom: "40px" }}>
+          <h2
+            style={{ fontSize: "28px", fontWeight: 800, marginBottom: "8px" }}
+          >
+            Connected Projects
+          </h2>
+        </div>
+        <div>Please select or create an organization to view projects.</div>
+      </Shell>
+    );
+  }
 
   return (
     <Shell activePage="Projects">
@@ -60,7 +73,11 @@ export default function ProjectsPage() {
           projects.map((p) => (
             <div
               key={p.id}
-              onClick={() => (window.location.href = "/explorer")}
+              onClick={() => {
+                setCurrentProjectId(p.id);
+                setRepositoryUrl(p.repositoryUrl);
+                router.push("/explorer");
+              }}
               style={{
                 cursor: "pointer",
                 transition: "all 0.2s ease",
@@ -387,6 +404,9 @@ export default function ProjectsPage() {
                                   repo.fullName,
                                 ) || false
                               }
+                              disabled={projects
+                                .map((pr) => pr.repositoryUrl)
+                                .includes(repo.fullName)}
                               onChange={(e) => {
                                 setSelectedRepos((prev) => {
                                   const newSelected = new Set(
@@ -404,7 +424,16 @@ export default function ProjectsPage() {
                                 });
                               }}
                             />
-                            <span>{repo.fullName}</span>
+                            <span>
+                              {repo.fullName}{" "}
+                              <b>
+                                {projects
+                                  .map((pr) => pr.repositoryUrl)
+                                  .includes(repo.fullName)
+                                  ? "(Already Added)"
+                                  : ""}
+                              </b>
+                            </span>
                             {repo.private && (
                               <span
                                 style={{

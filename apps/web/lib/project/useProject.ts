@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { apiGet, apiPost, apiPatch, apiDelete } from "../api/client";
+import { useProjectContext } from "./ProjectContext";
 
 export interface Project {
   id: string;
@@ -14,6 +15,14 @@ export const useProject = () => {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const {
+    projectId,
+    repositoryUrl,
+    setCurrentProjectId,
+    setRepositoryUrl,
+    projects,
+    setProjects,
+  } = useProjectContext();
 
   // Fetch projects for an organization
   const fetchProjects = async (orgId: string): Promise<Project[]> => {
@@ -23,6 +32,18 @@ export const useProject = () => {
       const projects = await apiGet<Project[]>(
         `${API_URL}/organizations/${orgId}/projects`,
       );
+      setProjects(projects);
+      if (
+        typeof projects !== "undefined" &&
+        projects.length > 0 &&
+        !projectId
+      ) {
+        const firstProject = projects[0];
+        if (firstProject) {
+          setCurrentProjectId(firstProject.id);
+          setRepositoryUrl(firstProject.repositoryUrl);
+        }
+      }
       return projects;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch projects");
@@ -46,6 +67,7 @@ export const useProject = () => {
         `${API_URL}/organizations/projects`,
         body,
       );
+      setProjects([...projects, project]);
       return project;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create project");
@@ -67,6 +89,7 @@ export const useProject = () => {
         `${API_URL}/projects/${projectId}`,
         data,
       );
+      setProjects(projects.map((p) => (p.id === projectId ? project : p)));
       return project;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update project");
@@ -82,6 +105,7 @@ export const useProject = () => {
     setError(null);
     try {
       await apiDelete(`${API_URL}/projects/${projectId}`);
+      setProjects(projects.filter((p) => p.id !== projectId));
       return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete project");
@@ -94,6 +118,12 @@ export const useProject = () => {
   return {
     loading,
     error,
+    projects,
+    projectId,
+    repositoryUrl,
+    setProjects,
+    setCurrentProjectId,
+    setRepositoryUrl,
     fetchProjects,
     createProject,
     updateProject,

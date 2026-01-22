@@ -22,17 +22,47 @@ export class OrganizationService {
       },
     });
 
+    console.log('Project created:', project);
     // Link repo data based on provider
     if (dto.provider === 'github' && dto.repoData) {
-      //data are there, just need to update the project id
-      await this.prisma.gitHubRepository.update({
-        data: {
-          projectId: project.id,
-        },
-        where: {
-          id: dto.repoData.id,
-        },
+      // Try to find by id first
+      let repo = await this.prisma.gitHubRepository.findUnique({
+        where: { id: dto.repoData.id },
       });
+      if (!repo && dto.repositoryUrl) {
+        // Try to find by fullName if id not found (fullName is the unique repo URL, e.g., owner/repo)
+        repo = await this.prisma.gitHubRepository.findFirst({
+          where: { fullName: dto.repositoryUrl },
+        });
+        if (repo) {
+          await this.prisma.gitHubRepository.update({
+            data: { projectId: project.id },
+            where: { id: repo.id },
+          });
+          console.log(
+            '[OrganizationService] Linked GitHubRepository by fullName:',
+            dto.repositoryUrl,
+          );
+        } else {
+          console.warn(
+            '[OrganizationService] No GitHubRepository found for id or fullName:',
+            dto.repoData.id,
+            dto.repositoryUrl,
+            '— skipping update.',
+          );
+        }
+      } else if (repo) {
+        await this.prisma.gitHubRepository.update({
+          data: { projectId: project.id },
+          where: { id: dto.repoData.id },
+        });
+      } else {
+        console.warn(
+          '[OrganizationService] No GitHubRepository found for id:',
+          dto.repoData.id,
+          '— skipping update.',
+        );
+      }
     }
     // Add other providers here (e.g., gitlab)
 

@@ -18,6 +18,7 @@ import {
   InviteMemberDto,
   RespondToRequestDto,
 } from './dto/organization.dto';
+import { cp } from 'fs';
 
 @UseGuards(JwtAuthGuard)
 @Controller('organizations')
@@ -26,23 +27,35 @@ export class OrganizationController {
   @Post('projects')
   async createProject(@Req() req, @Body() body) {
     // body should match CreateProjectDto
-    return this.orgService.createProjectWithRepo(req.user.id, body);
+    const result = await this.orgService.createProjectWithRepo(
+      req.user.id,
+      body,
+    );
+    console.log(
+      '[OrganizationController] ✓ Project created with repo:',
+      result,
+    );
+    return result;
   }
   constructor(private readonly orgService: OrganizationService) {}
 
   @Get()
   async findAll(@Req() req) {
     // Return organizations the user is a member of, with role
-    return this.orgService.getOrganizationsForUser(req.user.id);
+    const result = await this.orgService.getOrganizationsForUser(req.user.id);
+    console.log('[OrganizationController] ✓ Fetched organizations:', result);
+    return result;
   }
 
   @Post()
   async create(@Req() req, @Body() body: CreateOrganizationDto) {
-    return this.orgService.createOrganization(
+    const result = await this.orgService.createOrganization(
       req.user.id,
       body.name,
       body.domain,
     );
+    console.log('[OrganizationController] ✓ Organization created:', result);
+    return result;
   }
 
   @Patch(':id')
@@ -51,12 +64,20 @@ export class OrganizationController {
     @Param('id') id: string,
     @Body() body: UpdateOrganizationDto,
   ) {
-    return this.orgService.updateOrganization(id, req.user.id, body.name);
+    const result = await this.orgService.updateOrganization(
+      id,
+      req.user.id,
+      body.name,
+    );
+    console.log('[OrganizationController] ✓ Organization updated:', result);
+    return result;
   }
 
   @Delete(':id')
   async delete(@Req() req, @Param('id') id: string) {
-    return this.orgService.deleteOrganization(id, req.user.id);
+    const result = await this.orgService.deleteOrganization(id, req.user.id);
+    console.log('[OrganizationController] ✓ Organization deleted:', result);
+    return result;
   }
 
   @Post(':id/invite')
@@ -65,7 +86,13 @@ export class OrganizationController {
     @Param('id') id: string,
     @Body() body: InviteMemberDto,
   ) {
-    return this.orgService.inviteMember(id, req.user.id, body.userId);
+    const result = await this.orgService.inviteMember(
+      id,
+      req.user.id,
+      body.userId,
+    );
+    console.log('[OrganizationController] ✓ Member invited:', result);
+    return result;
   }
 
   @Post(':id/respond')
@@ -74,7 +101,13 @@ export class OrganizationController {
     @Param('id') id: string,
     @Body() body: RespondToRequestDto,
   ) {
-    return this.orgService.respondToRequest(id, req.user.id, body.accept);
+    const result = await this.orgService.respondToRequest(
+      id,
+      req.user.id,
+      body.accept,
+    );
+    console.log('[OrganizationController] ✓ Responded to request:', result);
+    return result;
   }
 
   @Get('search-users')
@@ -85,36 +118,67 @@ export class OrganizationController {
     @Query('orgId') orgId?: string,
   ) {
     // Optionally exclude the current user from results
-    return this.orgService.searchUsersByDomain(domain, q, [req.user.id], orgId);
+    const result = await this.orgService.searchUsersByDomain(
+      domain,
+      q,
+      [req.user.id],
+      orgId,
+    );
+    console.log('[OrganizationController] ✓ Users searched:', result);
+    return result;
   }
 
   // Get outgoing membership requests (sent by owner)
   @Get('sent-requests')
   async sentRequests(@Req() req) {
-    return this.orgService.getSentMembershipRequests(req.user.id);
+    const result = await this.orgService.getSentMembershipRequests(req.user.id);
+    console.log(
+      '[OrganizationController] ✓ Sent membership requests fetched:',
+      result,
+    );
+    return result;
   }
 
   // Get incoming membership requests (for the user)
   @Get('incoming-requests')
   async incomingRequests(@Req() req) {
-    return this.orgService.getIncomingMembershipRequests(req.user.id);
+    const result = await this.orgService.getIncomingMembershipRequests(
+      req.user.id,
+    );
+    console.log(
+      '[OrganizationController] ✓ Incoming membership requests fetched:',
+      result,
+    );
+    return result;
   }
 
   // Leave organization (member only)
   @Post(':id/leave')
   async leave(@Req() req, @Param('id') id: string) {
-    return this.orgService.leaveOrganization(id, req.user.id);
+    const result = await this.orgService.leaveOrganization(id, req.user.id);
+    console.log('[OrganizationController] ✓ Left organization:', result);
+    return result;
   }
 
   // Get all members of an organization with their roles
   @Get(':id/members')
   async getMembers(@Req() req, @Param('id') id: string) {
-    return this.orgService.getOrganizationMembers(id);
+    const result = await this.orgService.getOrganizationMembers(id);
+    console.log(
+      '[OrganizationController] ✓ Organization members fetched:',
+      result,
+    );
+    return result;
   }
 
   // Get all projects under an organization, including repo details
   @Get(':id/projects')
   async getProjects(@Req() req, @Param('id') id: string) {
-    return this.orgService.getProjectsWithRepo(id);
+    const result = await this.orgService.getProjectsWithRepo(id);
+    console.log(
+      '[OrganizationController] ✓ Organization projects fetched:',
+      result,
+    );
+    return result;
   }
 }

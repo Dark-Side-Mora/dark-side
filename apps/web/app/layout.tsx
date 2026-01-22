@@ -3,6 +3,7 @@ import "./globals.css";
 import { Toaster } from "sonner";
 import { AuthProvider } from "../lib/auth/auth-context";
 import { OrganizationProvider } from "@/lib/organization/OrganizationContext";
+import { ProjectContextProvider } from "@/lib/project/ProjectContext";
 
 export const metadata: Metadata = {
   title: "CI-Insight | Unified CI/CD Intelligence",
@@ -22,7 +23,9 @@ export default function RootLayout({
       </head>
       <body>
         <OrganizationProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <ProjectContextProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </ProjectContextProvider>
         </OrganizationProvider>
         {/* Global Toasts */}
         <Toaster position="top-right" richColors closeButton />

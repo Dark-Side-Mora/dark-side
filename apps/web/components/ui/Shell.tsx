@@ -5,6 +5,7 @@ import { Button } from "./Button";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useAuthContext } from "@/lib/auth/auth-context";
 import { useOrganization } from "@/lib/organization/useOrganization";
+import { useProject } from "@/lib/project/useProject";
 
 // --- Icons (Inline SVGs for Figma compatibility) ---
 const LogoIcon = () => (
@@ -235,9 +236,23 @@ export const Shell = ({
     loading: orgLoading,
   } = useOrganization();
 
+  const {
+    projectId,
+    projects,
+    setProjects,
+    setCurrentProjectId,
+    setRepositoryUrl,
+    fetchProjects,
+    loading: proLoading,
+  } = useProject();
+
   useEffect(() => {
     if (currentOrgId === null) fetchOrganizations();
   }, []);
+
+  useEffect(() => {
+    fetchProjects(currentOrgId!);
+  }, [currentOrgId]);
 
   useEffect(() => {
     // Check localStorage on mount
@@ -483,63 +498,122 @@ export const Shell = ({
             zIndex: 40,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            {/* Hamburger for mobile */}
-            <button
-              className="mobile-only"
-              onClick={() => setIsSidebarOpen(true)}
-              style={{
-                background: "transparent",
-                border: "none",
-                color: "var(--text-primary)",
-                cursor: "pointer",
-                marginRight: "8px",
-                display: "none",
-              }}
-            >
-              <IconMenu />
-            </button>
-            <span
-              style={{ fontSize: "14px", color: "var(--text-secondary)" }}
-              className="desktop-only"
-            >
-              Organization:
-            </span>
-            {orgLoading ? (
-              <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>
-                Loading...
-              </span>
-            ) : organizations.length === 0 ? (
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => (window.location.href = "/settings")}
-              >
-                No Organization
-              </Button>
-            ) : (
-              <select
-                value={currentOrgId || organizations[0]?.id}
-                onChange={(e) => selectOrganization(e.target.value)}
+          <div style={{ display: "flex", gap: "24px", alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              {/* Hamburger for mobile */}
+              <button
+                className="mobile-only"
+                onClick={() => setIsSidebarOpen(true)}
                 style={{
-                  fontSize: 14,
-                  fontWeight: 600,
-                  padding: "4px 12px",
-                  borderRadius: 8,
-                  border: "1px solid var(--border)",
-                  background: "var(--bg-sidebar)",
+                  background: "transparent",
+                  border: "none",
                   color: "var(--text-primary)",
-                  minWidth: 120,
                   cursor: "pointer",
+                  marginRight: "8px",
+                  display: "none",
                 }}
               >
-                {organizations.map((org) => (
-                  <option key={org.id} value={org.id}>
-                    {org.name} ({org.role})
-                  </option>
-                ))}
-              </select>
-            )}
+                <IconMenu />
+              </button>
+              <span
+                style={{ fontSize: "14px", color: "var(--text-secondary)" }}
+                className="desktop-only"
+              >
+                Organization:
+              </span>
+              {orgLoading ? (
+                <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>
+                  Loading...
+                </span>
+              ) : organizations.length === 0 ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => (window.location.href = "/settings")}
+                >
+                  No Organization
+                </Button>
+              ) : (
+                <select
+                  value={currentOrgId || organizations[0]?.id}
+                  onChange={(e) => selectOrganization(e.target.value)}
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    padding: "4px 12px",
+                    borderRadius: 8,
+                    border: "1px solid var(--border)",
+                    background: "var(--bg-sidebar)",
+                    color: "var(--text-primary)",
+                    minWidth: 120,
+                    cursor: "pointer",
+                  }}
+                >
+                  {organizations.map((org) => (
+                    <option key={org.id} value={org.id}>
+                      {org.name} ({org.role})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            {/* <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <button
+                className="mobile-only"
+                onClick={() => setIsSidebarOpen(true)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "var(--text-primary)",
+                  cursor: "pointer",
+                  marginRight: "8px",
+                  display: "none",
+                }}
+              >
+                <IconMenu />
+              </button>
+              <span
+                style={{ fontSize: "14px", color: "var(--text-secondary)" }}
+                className="desktop-only"
+              >
+                Projects:
+              </span>
+              {proLoading ? (
+                <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>
+                  Loading...
+                </span>
+              ) : projects.length === 0 ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => (window.location.href = "/projects")}
+                >
+                  No Projects
+                </Button>
+              ) : (
+                <select
+                  value={projectId || projects[0]?.id}
+                  onChange={(e) => setCurrentProjectId(e.target.value)}
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    padding: "4px 12px",
+                    borderRadius: 8,
+                    border: "1px solid var(--border)",
+                    background: "var(--bg-sidebar)",
+                    color: "var(--text-primary)",
+                    minWidth: 120,
+                    cursor: "pointer",
+                  }}
+                >
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div> */}
           </div>
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
             <button
