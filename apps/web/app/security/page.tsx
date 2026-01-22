@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Shell } from "../../components/ui/Shell";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Input";
@@ -9,6 +9,9 @@ import { useAiSecurity } from "../../lib/project/useAi";
 export default function SecurityPage() {
   const [userId] = useState("test-user-123");
   const [selectedRepo, setSelectedRepo] = useState("");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownTriggerRef = useRef<HTMLDivElement>(null);
+  const dropdownMenuRef = useRef<HTMLDivElement>(null);
   const {
     installations,
     securityAnalysis,
@@ -29,6 +32,28 @@ export default function SecurityPage() {
   const handleAnalyzeSecurity = () => {
     if (selectedRepo) fetchSecurityAnalysis(selectedRepo);
   };
+
+  // Flatten all repos for dropdown
+  const repos: Repository[] = installations.flatMap(
+    (inst: Installation) => inst.repositories,
+  );
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (
+        dropdownMenuRef.current &&
+        !dropdownMenuRef.current.contains(e.target as Node) &&
+        dropdownTriggerRef.current &&
+        !dropdownTriggerRef.current.contains(e.target as Node)
+      ) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [dropdownOpen]);
 
   // Helper for color
   type RiskLevel = "critical" | "high" | "medium" | "low" | string;
@@ -145,28 +170,98 @@ export default function SecurityPage() {
             </Button>
           </div>
 
-          {/* Repo selection */}
-          {installations.length > 0 && (
-            <div style={{ marginBottom: 24 }}>
-              <select
-                value={selectedRepo}
-                onChange={(e) => setSelectedRepo(e.target.value)}
+          {/* Repo Dropdown */}
+          {repos.length > 0 && (
+            <div style={{ position: "relative", marginBottom: "24px" }}>
+              <div
+                ref={dropdownTriggerRef}
+                onClick={() => setDropdownOpen((v) => !v)}
+                id="project-dropdown-trigger"
                 style={{
-                  padding: 8,
-                  borderRadius: 8,
-                  border: "1px solid var(--border)",
-                  minWidth: 220,
+                  width: "100%",
+                  padding: "12px 16px",
+                  borderRadius: "10px",
+                  backgroundColor: "var(--bg-card)",
+                  borderWidth: 1,
+                  borderStyle: "solid",
+                  borderColor: "var(--border)",
+                  color: "var(--text-primary)",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
                 }}
               >
-                <option value="">-- Select a repository --</option>
-                {installations.map((inst: Installation) =>
-                  inst.repositories.map((repo: Repository) => (
-                    <option key={repo.id} value={repo.fullName}>
-                      {repo.fullName} {repo.private ? "🔒" : ""}
-                    </option>
-                  )),
-                )}
-              </select>
+                <span>{selectedRepo || "Select a repository"}</span>
+                <svg width="10" height="6" viewBox="0 0 10 6" fill="none">
+                  <path
+                    d="M1 1L5 5L9 1"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+              <div
+                ref={dropdownMenuRef}
+                id="project-dropdown-menu"
+                style={{
+                  display: dropdownOpen ? "block" : "none",
+                  position: "absolute",
+                  top: "calc(100% + 8px)",
+                  left: 0,
+                  right: 0,
+                  backgroundColor: "var(--bg-card)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "12px",
+                  boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
+                  overflow: "hidden",
+                  zIndex: 110,
+                  color: "var(--text-primary)",
+                }}
+              >
+                {repos.map((r) => (
+                  <div
+                    key={r.id}
+                    onClick={() => {
+                      setSelectedRepo(r.fullName);
+                      setDropdownOpen(false);
+                    }}
+                    style={{
+                      padding: "12px 16px",
+                      fontSize: "14px",
+                      color:
+                        r.fullName === selectedRepo
+                          ? "var(--accent-cyan)"
+                          : "var(--text-primary)",
+                      cursor: "pointer",
+                      backgroundColor:
+                        r.fullName === selectedRepo
+                          ? "rgba(6, 182, 212, 0.05)"
+                          : "transparent",
+                      transition: "all 0.2s ease",
+                      borderBottomWidth: 1,
+                      borderBottomStyle: "solid",
+                      borderBottomColor: "var(--border)",
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.backgroundColor =
+                        "var(--glass-bg)")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.backgroundColor =
+                        r.fullName === selectedRepo
+                          ? "rgba(6, 182, 212, 0.05)"
+                          : "transparent")
+                    }
+                  >
+                    {r.fullName} {r.private ? "🔒" : ""}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
