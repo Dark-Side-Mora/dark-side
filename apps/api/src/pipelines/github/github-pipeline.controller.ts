@@ -5,6 +5,8 @@ import {
   Param,
   BadRequestException,
   HttpStatus,
+  UseGuards,
+  Req,
 } from '@nestjs/common';
 import { GithubPipelineService } from './github-pipeline.service';
 import { PipelineAnalysisService } from '../services/pipeline-analysis.service';
@@ -13,8 +15,10 @@ import {
   FetchPipelinesParamsDto,
 } from './dto/fetch-pipelines.dto';
 import { PipelineResponseDto } from './dto/pipeline-response.dto';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
 @Controller('pipelines/github')
+@UseGuards(JwtAuthGuard)
 export class GithubPipelineController {
   constructor(
     private readonly githubPipelineService: GithubPipelineService,
@@ -34,6 +38,7 @@ export class GithubPipelineController {
    */
   @Get(':repoIdentifier/data')
   async fetchAllPipelineData(
+    @Req() req: any,
     @Param('repoIdentifier') repoIdentifier: string,
     @Query() query: FetchPipelinesDto,
   ): Promise<{
@@ -42,7 +47,8 @@ export class GithubPipelineController {
     data: PipelineResponseDto;
   }> {
     try {
-      const { userId, limit } = query;
+      const { limit } = query;
+      const userId = req.user?.id;
 
       if (!userId) {
         throw new BadRequestException('userId is required');
@@ -86,10 +92,11 @@ export class GithubPipelineController {
    */
   @Get(':repoIdentifier/workflows')
   async fetchWorkflows(
+    @Req() req: any,
     @Param('repoIdentifier') repoIdentifier: string,
-    @Query('userId') userId: string,
   ) {
     try {
+      const userId = req.user?.id;
       if (!userId) {
         throw new BadRequestException('userId is required');
       }
@@ -122,10 +129,11 @@ export class GithubPipelineController {
    */
   @Get(':repoIdentifier/analyze')
   async analyzePipelineSecurity(
+    @Req() req: any,
     @Param('repoIdentifier') repoIdentifier: string,
-    @Query('userId') userId: string,
   ) {
     try {
+      const userId = req.user?.id;
       if (!userId) {
         throw new BadRequestException('userId is required');
       }

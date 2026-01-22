@@ -330,6 +330,19 @@ export class GithubAppService {
       },
     });
 
+    const projects = await this.prisma.project.findMany({
+      where: { userId, provider: 'github' },
+    });
+
+    // filter the repos with projects
+    for (const inst of installations) {
+      inst.repositories = inst.repositories.filter((repo) =>
+        projects.some(
+          (proj) => proj.repositoryUrl === repo.fullName.toString(),
+        ),
+      );
+    }
+
     return installations;
   }
 
