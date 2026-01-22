@@ -24,10 +24,14 @@ model User {
 model Project {
   id            String     @id @default(uuid())
   name          String
-  provider      String     // e.g., 'github', 'gitlab'
+  provider      String     // 'github', 'gitlab', etc.
   repositoryUrl String
   pipelines     Pipeline[]
   userId        String     // Supabase Auth User ID
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  githubRepositories GitHubRepository[] // If provider is 'github', link to GitHubRepository
+  // For future: gitlabRepositories GitLabRepository[]
   createdAt     DateTime   @default(now())
 }
 
@@ -128,6 +132,8 @@ model GitHubRepository {
   id             String             @id @default(uuid())
   installationId String
   installation   GitHubInstallation @relation(fields: [installationId], references: [id], onDelete: Cascade)
+  projectId      String?
+  project        Project?           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   repositoryId   String             // GitHub repo ID
   name           String             // Repo name
   fullName       String             // owner/repo
@@ -139,6 +145,7 @@ model GitHubRepository {
   @@unique([installationId, repositoryId])
   @@index([installationId])
   @@index([repositoryId])
+  @@index([projectId])
 }
 
 model WorkflowAnalysisCache {
@@ -311,6 +318,7 @@ model Organization {
   domain    String
   members   OrganizationMembership[]
   requests  MembershipRequest[]
+  projects  Project[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

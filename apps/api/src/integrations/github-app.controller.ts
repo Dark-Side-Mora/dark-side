@@ -9,9 +9,12 @@ import {
   HttpStatus,
   Res,
   Headers,
+  UseGuards,
+  Req,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { GithubAppService } from './github-app.service';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
 @Controller('integrations/github-app')
 export class GithubAppController {
@@ -21,18 +24,16 @@ export class GithubAppController {
    * POST /integrations/github-app/authorize
    * Generate GitHub App OAuth authorization URL
    */
+  @UseGuards(JwtAuthGuard)
   @Post('authorize')
   async initiateAuthorization(
-    @Body() body: { userId: string; redirectUri?: string },
+    @Req() req,
+    @Body() body: { redirectUri?: string },
   ) {
-    const { userId, redirectUri } = body;
-
-    if (!userId) {
-      throw new BadRequestException('userId is required');
-    }
+    const { redirectUri } = body;
 
     const authUrl = this.githubAppService.generateAuthorizationUrl(
-      userId,
+      req.user.id,
       redirectUri,
     );
 
@@ -49,18 +50,13 @@ export class GithubAppController {
    * POST /integrations/github-app/install
    * Generate GitHub App installation URL
    */
+  @UseGuards(JwtAuthGuard)
   @Post('install')
-  async initiateInstall(
-    @Body() body: { userId: string; redirectUri?: string },
-  ) {
-    const { userId, redirectUri } = body;
-
-    if (!userId) {
-      throw new BadRequestException('userId is required');
-    }
+  async initiateInstall(@Req() req, @Body() body: { redirectUri?: string }) {
+    const { redirectUri } = body;
 
     const installUrl = this.githubAppService.generateInstallationUrl(
-      userId,
+      req.user.id,
       redirectUri,
     );
 
@@ -131,14 +127,12 @@ export class GithubAppController {
    * GET /integrations/github-app/installations
    * Get user's GitHub App installations
    */
+  @UseGuards(JwtAuthGuard)
   @Get('installations')
-  async getInstallations(@Query('userId') userId: string) {
-    if (!userId) {
-      throw new BadRequestException('userId query parameter is required');
-    }
-
-    const installations =
-      await this.githubAppService.getUserInstallations(userId);
+  async getInstallations(@Req() req) {
+    const installations = await this.githubAppService.getUserInstallations(
+      req.user.id,
+    );
 
     return {
       statusCode: HttpStatus.OK,
@@ -168,21 +162,22 @@ export class GithubAppController {
    * POST /integrations/github-app/installations/:installationId/sync
    * Sync installation repositories from GitHub
    */
-  @Post('installations/:installationId/sync')
-  async syncInstallation(@Param('installationId') installationId: string) {
-    if (!installationId) {
-      throw new BadRequestException('installationId is required');
-    }
+  // @UseGuards(JwtAuthGuard)
+  // @Post('installations/:installationId/sync')
+  // async syncInstallation(@Param('installationId') installationId: string) {
+  //   if (!installationId) {
+  //     throw new BadRequestException('installationId is required');
+  //   }
 
-    const result =
-      await this.githubAppService.syncInstallationRepositories(installationId);
+  //   const result =
+  //     await this.githubAppService.syncInstallationRepositories(installationId);
 
-    return {
-      statusCode: HttpStatus.OK,
-      message: 'Installation synced successfully',
-      data: result,
-    };
-  }
+  //   return {
+  //     statusCode: HttpStatus.OK,
+  //     message: 'Installation synced successfully',
+  //     data: result,
+  //   };
+  // }
 
   /**
    * POST /integrations/github-app/webhook

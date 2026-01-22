@@ -307,6 +307,19 @@ export class GithubAppService {
    * Get user's installations with repositories
    */
   async getUserInstallations(userId: string) {
+    // get installation ids
+    const installations_prev = await this.prisma.gitHubInstallation.findMany({
+      where: { userId },
+      include: {
+        repositories: true,
+      },
+    });
+    // sync
+    for (const inst of installations_prev) {
+      await this.syncInstallationRepositories(inst.id);
+    }
+
+    // fetch from database
     const installations = await this.prisma.gitHubInstallation.findMany({
       where: { userId },
       include: {

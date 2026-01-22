@@ -229,14 +229,14 @@ export const Shell = ({
   const {
     organizations,
     currentOrgId,
+    setOrganizations,
     selectOrganization,
     fetchOrganizations,
     loading: orgLoading,
   } = useOrganization();
 
   useEffect(() => {
-    fetchOrganizations();
-     
+    if (currentOrgId === null) fetchOrganizations();
   }, []);
 
   useEffect(() => {
@@ -499,11 +499,16 @@ export const Shell = ({
             >
               <IconMenu />
             </button>
-            <span style={{ fontSize: "14px", color: "var(--text-secondary)" }} className="desktop-only">
+            <span
+              style={{ fontSize: "14px", color: "var(--text-secondary)" }}
+              className="desktop-only"
+            >
               Organization:
             </span>
             {orgLoading ? (
-              <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>Loading...</span>
+              <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>
+                Loading...
+              </span>
             ) : organizations.length === 0 ? (
               <Button
                 size="sm"
@@ -515,7 +520,7 @@ export const Shell = ({
             ) : (
               <select
                 value={currentOrgId || organizations[0]?.id}
-                onChange={e => selectOrganization(e.target.value)}
+                onChange={(e) => selectOrganization(e.target.value)}
                 style={{
                   fontSize: 14,
                   fontWeight: 600,
@@ -528,7 +533,7 @@ export const Shell = ({
                   cursor: "pointer",
                 }}
               >
-                {organizations.map(org => (
+                {organizations.map((org) => (
                   <option key={org.id} value={org.id}>
                     {org.name} ({org.role})
                   </option>

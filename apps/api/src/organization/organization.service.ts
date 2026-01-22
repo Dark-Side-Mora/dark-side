@@ -8,6 +8,48 @@ import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class OrganizationService {
+  // Common method to create a project and link repo data
+  async createProjectWithRepo(userId: string, dto: any) {
+    console.log('Creating project with DTO:', dto);
+    // Create the project
+    const project = await this.prisma.project.create({
+      data: {
+        organizationId: dto.organizationId,
+        name: dto.name,
+        provider: dto.provider,
+        repositoryUrl: dto.repositoryUrl,
+        userId,
+      },
+    });
+
+    // Link repo data based on provider
+    if (dto.provider === 'github' && dto.repoData) {
+      //data are there, just need to update the project id
+      await this.prisma.gitHubRepository.update({
+        data: {
+          projectId: project.id,
+        },
+        where: {
+          id: dto.repoData.id,
+        },
+      });
+    }
+    // Add other providers here (e.g., gitlab)
+
+    return project;
+  }
+  // Fetch all projects under an organization, including actual repo details
+  async getProjectsWithRepo(orgId: string) {
+    // Get projects for the organization
+    const projects = await this.prisma.project.findMany({
+      where: { organizationId: orgId },
+      include: {
+        githubRepositories: true, // For provider 'github'
+        // Add other provider repo includes here (e.g., gitlabRepositories)
+      },
+    });
+    return projects;
+  }
   constructor(private prisma: PrismaService) {}
 
   async getOrganizationsForUser(userId: string) {

@@ -8,6 +8,8 @@ import {
   BadRequestException,
   HttpStatus,
   Res,
+  UseGuards,
+  Req,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { GithubService } from './github.service';
@@ -16,6 +18,7 @@ import {
   GithubCallbackDto,
   UpdateRepositoriesDto,
 } from './dto';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
 @Controller('integrations/github')
 export class GithubController {
@@ -25,10 +28,11 @@ export class GithubController {
    * POST /integrations/github/authorize
    * Initiates GitHub OAuth flow
    */
+  @UseGuards(JwtAuthGuard)
   @Post('authorize')
-  async authorize(@Body() dto: AuthorizeGithubDto) {
+  async authorize(@Req() req, @Body() dto: AuthorizeGithubDto) {
     const authUrl = this.githubService.generateAuthorizationUrl(
-      dto.userId,
+      req.user.id,
       dto.redirectUri,
     );
 

@@ -22,6 +22,12 @@ import {
 @UseGuards(JwtAuthGuard)
 @Controller('organizations')
 export class OrganizationController {
+  // Common endpoint to create a project and link repo data
+  @Post('projects')
+  async createProject(@Req() req, @Body() body) {
+    // body should match CreateProjectDto
+    return this.orgService.createProjectWithRepo(req.user.id, body);
+  }
   constructor(private readonly orgService: OrganizationService) {}
 
   @Get()
@@ -103,8 +109,12 @@ export class OrganizationController {
   // Get all members of an organization with their roles
   @Get(':id/members')
   async getMembers(@Req() req, @Param('id') id: string) {
-    // Optionally, check if the user is a member of the org before returning
-    // (for now, just call the service)
     return this.orgService.getOrganizationMembers(id);
+  }
+
+  // Get all projects under an organization, including repo details
+  @Get(':id/projects')
+  async getProjects(@Req() req, @Param('id') id: string) {
+    return this.orgService.getProjectsWithRepo(id);
   }
 }

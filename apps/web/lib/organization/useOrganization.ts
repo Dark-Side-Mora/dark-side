@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useOrganizationContext } from "./OrganizationContext";
 import { apiGet, apiPost, apiPatch, apiDelete } from "../api/client";
 
 export interface Organization {
@@ -16,8 +17,24 @@ export interface OrganizationMember {
 }
 
 export const useOrganization = () => {
+  // Fetch projects under an organization
+  const fetchOrganizationProjects = async (orgId: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const projects = await apiGet<any[]>(
+        `${API_URL}/organizations/${orgId}/projects`,
+      );
+      return projects;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch projects");
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  };
   const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [currentOrgId, setCurrentOrgId] = useState<string | null>(null);
+  const { currentOrgId, setCurrentOrgId } = useOrganizationContext();
   const [loading, setLoading] = useState(false); // For organization list
   const [error, setError] = useState<string | null>(null);
   // Separate loading and error for requests (sent/incoming/search)
@@ -266,5 +283,6 @@ export const useOrganization = () => {
     requestsLoading,
     requestsError,
     fetchOrganizationMembers,
+    fetchOrganizationProjects,
   };
 };
