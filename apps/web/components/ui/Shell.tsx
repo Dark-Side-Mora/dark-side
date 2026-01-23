@@ -319,7 +319,6 @@ export const Shell = ({
     { name: "Projects", icon: <IconProjects />, path: "/projects" },
     { name: "Run Explorer", icon: <IconExplorer />, path: "/explorer" },
     { name: "Security", icon: <IconSecurity />, path: "/security" },
-    { name: "Analytics", icon: <IconAnalytics />, path: "/analytics" },
     { name: "Learning Hub", icon: <IconLearning />, path: "/learning" },
     { name: "Settings", icon: <IconSettings />, path: "/settings" },
   ];
