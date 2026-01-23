@@ -1,216 +1,276 @@
 import { PrismaClient } from '@prisma/client';
-
 const prisma = new PrismaClient();
 
-/**
- * Type definition for quiz data
- */
-interface QuestionData {
-  order: number;
-  title: string;
-  description: string;
-  type: string;
-  vulnerableCode?: string;
-  codeLanguage?: string;
-  choices?: string[];
-  hint: string;
-  explanation: string;
-  correctCode?: string;
-  correctChoice?: number;
-  acceptableAnswers?: string[];
-  points: number;
-}
-
-interface QuizData {
-  title: string;
-  description: string;
-  category: string;
-  difficulty: string;
-  type: string;
-  totalQuestions: number;
-  estimatedTime: number;
-  tags: string[];
-  questions: QuestionData[];
-}
-
-/**
- * Sample quiz data for development and testing
- */
-const SAMPLE_QUIZZES: QuizData[] = [
+const SAMPLE_COURSE_MODULES = [
   {
-    title: 'GitHub Actions Security Basics',
-    description:
-      'Learn how to secure your GitHub Actions workflows by identifying and fixing common vulnerabilities.',
-    category: 'security',
+    title: 'CI/CD Best Practices',
+    status: 'Available',
+    length: '15 mins',
+    icon: '🎯',
+    order: 1,
+  },
+  {
+    title: 'Securing Your Pipeline',
+    status: 'Paused',
+    length: '25 mins',
+    icon: '🛡️',
+    order: 2,
+  },
+  {
+    title: 'Optimizing Build Times',
+    status: 'Coming Soon',
+    length: '20 mins',
+    icon: '⚡',
+    order: 3,
+  },
+  {
+    title: 'Monitoring & Observability',
+    status: 'Coming Soon',
+    length: '30 mins',
+    icon: '📊',
+    order: 4,
+  },
+];
+
+const SAMPLE_QUIZZES = [
+  // 2 quizzes per module, 4-5 questions per quiz
+  // Module 1
+  {
+    name: 'CI/CD Fundamentals',
+    description: 'Test your knowledge of basic CI/CD concepts.',
     difficulty: 'beginner',
-    type: 'workflow-fix',
-    totalQuestions: 2,
-    estimatedTime: 10,
-    tags: ['secrets', 'permissions', 'github-actions'],
+    courseModuleOrder: 1,
     questions: [
       {
-        order: 1,
-        title: 'Fix the Hardcoded Secret',
-        description:
-          'This workflow has a hardcoded API key. Fix it by using GitHub Secrets.',
-        type: 'workflow-fix',
-        vulnerableCode: `name: Deploy
-on: push
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Deploy
-        env:
-          API_KEY: "sk-1234567890abcdef"
-        run: |
-          curl -H "Authorization: Bearer $API_KEY" https://api.example.com/deploy`,
-        codeLanguage: 'yaml',
-        hint: 'Use GitHub Secrets instead of hardcoded values. Access secrets with ${{ secrets.SECRET_NAME }}',
-        explanation:
-          'Hardcoded secrets in workflows are a security risk because they can be exposed in logs or repository history. Always use GitHub Secrets for sensitive values.',
-        correctCode: `name: Deploy
-on: push
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Deploy
-        env:
-          API_KEY: \${{ secrets.API_KEY }}
-        run: |
-          curl -H "Authorization: Bearer $API_KEY" https://api.example.com/deploy`,
+        type: 'multiple-choice',
+        question: 'What does CI stand for?',
+        choices: [
+          'Continuous Integration',
+          'Code Inspection',
+          'Continuous Improvement',
+          'Critical Infrastructure',
+        ],
+        correctIndex: 0,
         points: 10,
+        hint: 'It is about integrating code changes frequently.',
       },
       {
-        order: 2,
-        title: 'Restrict Workflow Permissions',
-        description:
-          'This workflow runs with excessive permissions. Restrict them appropriately.',
-        type: 'workflow-fix',
-        vulnerableCode: `name: Build
-on: [push, pull_request]
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    permissions: write-all
-    steps:
-      - uses: actions/checkout@v3
-      - run: npm install && npm run build`,
-        codeLanguage: 'yaml',
-        hint: 'Use the principle of least privilege. Only grant the permissions that are absolutely necessary.',
-        explanation:
-          'Using write-all permissions is dangerous. You should explicitly grant only the permissions needed for your workflow to prevent potential supply chain attacks.',
-        correctCode: `name: Build
-on: [push, pull_request]
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v3
-      - run: npm install && npm run build`,
+        type: 'multiple-choice',
+        question: 'Which tool is commonly used for CI/CD pipelines?',
+        choices: ['Photoshop', 'Jenkins', 'Excel', 'Slack'],
+        correctIndex: 1,
         points: 10,
+        hint: 'It is an open-source automation server.',
+      },
+      {
+        type: 'workflow-fix',
+        question:
+          'Select the best way to store secrets in a GitHub Actions workflow.',
+        choices: [
+          'Hardcode the secret in YAML',
+          'Store in GitHub Secrets and reference with ${{ secrets.KEY }}',
+          'Commit to a .env file in the repo',
+          'Email the secret to the team',
+        ],
+        correctIndex: 1,
+        points: 15,
+        workflowCode: `name: Example Workflow{NEWLINE}on: [push]{NEWLINE}jobs:{NEWLINE}{TAB}build:{NEWLINE}{TAB}{TAB}runs-on: ubuntu-latest{NEWLINE}{TAB}{TAB}steps:{NEWLINE}{TAB}{TAB}{TAB}- name: Use secret{NEWLINE}{TAB}{TAB}{TAB}run: echo \${{ secrets.API_KEY }}`,
+        hint: 'Never hardcode secrets.',
+      },
+      {
+        type: 'multiple-choice',
+        question: 'What is the main benefit of automated testing in CI/CD?',
+        choices: [
+          'Faster deployments',
+          'Manual error checking',
+          'Longer release cycles',
+          'More paperwork',
+        ],
+        correctIndex: 0,
+        points: 10,
+        hint: 'Think about speed and reliability.',
       },
     ],
   },
   {
-    title: 'Dependency Management Best Practices',
-    description:
-      'Learn how to safely manage dependencies in your CI/CD workflows.',
-    category: 'best-practices',
+    name: 'CI/CD Advanced',
+    description: 'Advanced questions on CI/CD best practices.',
     difficulty: 'intermediate',
-    type: 'multiple-choice',
-    totalQuestions: 2,
-    estimatedTime: 15,
-    tags: ['dependencies', 'supply-chain', 'security'],
+    courseModuleOrder: 1,
     questions: [
       {
-        order: 1,
-        title: 'What is the best practice for managing action versions?',
-        description:
-          'Choose the most secure approach for using GitHub Actions.',
         type: 'multiple-choice',
+        question: 'What is a pipeline stage?',
         choices: [
-          'Always use the @main tag for latest features',
-          'Pin to a specific commit hash like @abc123def',
-          'Use major version tags like @v2',
-          'Use release tags like @v2.1.0',
+          'A step in a pipeline',
+          'A type of test',
+          'A deployment environment',
+          'A code branch',
         ],
-        hint: 'Consider both security and maintainability.',
-        explanation:
-          'While @v2 is better than @main, pinning to a specific commit hash (@abc123def) provides the best security by preventing unexpected changes. Tags like @v2.1.0 are a good balance between security and maintainability.',
-        correctChoice: 1,
+        correctIndex: 0,
         points: 10,
+        hint: 'Pipelines are made of these.',
       },
       {
-        order: 2,
-        title: 'How should you verify npm packages?',
-        description:
-          "What's the best way to ensure npm packages are legitimate?",
+        type: 'workflow-fix',
+        question: 'How should workflow permissions be set?',
+        choices: [
+          'Use write-all permissions',
+          'Grant only the permissions needed for the job',
+          'Use default permissions',
+          'Grant admin permissions to all jobs',
+        ],
+        correctIndex: 1,
+        points: 15,
+        workflowCode: `name: Principle of Least Privilege{NEWLINE}on: [push]{NEWLINE}permissions:{NEWLINE}{TAB}contents: read{NEWLINE}jobs:{NEWLINE}{TAB}build:{NEWLINE}{TAB}{TAB}runs-on: ubuntu-latest{NEWLINE}{TAB}{TAB}steps:{NEWLINE}{TAB}{TAB}{TAB}- name: Checkout{NEWLINE}{TAB}{TAB}{TAB}uses: actions/checkout@v3`,
+        hint: 'Principle of least privilege.',
+      },
+      {
         type: 'multiple-choice',
+        question: 'Which of these is NOT a CI/CD tool?',
+        choices: ['GitHub Actions', 'Travis CI', 'Docker', 'Jenkins'],
+        correctIndex: 2,
+        points: 10,
+        hint: 'One is a container platform.',
+      },
+      {
+        type: 'multiple-choice',
+        question: 'What is the purpose of a build artifact?',
+        choices: [
+          'To store build outputs',
+          'To run tests',
+          'To write documentation',
+          'To manage secrets',
+        ],
+        correctIndex: 0,
+        points: 10,
+        hint: 'Artifacts are outputs.',
+      },
+      {
+        type: 'multiple-choice',
+        question: 'What is the first step in a typical CI pipeline?',
+        choices: [
+          'Deploy to production',
+          'Run tests',
+          'Checkout code',
+          'Send notifications',
+        ],
+        correctIndex: 2,
+        points: 10,
+        hint: 'You need the code first!',
+      },
+    ],
+  },
+  // Module 2
+  {
+    name: 'Pipeline Security',
+    description: 'Security best practices for pipelines.',
+    difficulty: 'intermediate',
+    courseModuleOrder: 2,
+    questions: [
+      {
+        type: 'multiple-choice',
+        question: 'What is the risk of hardcoding secrets?',
+        choices: [
+          'No risk',
+          'Secrets can be leaked',
+          'Faster builds',
+          'Better performance',
+        ],
+        correctIndex: 1,
+        points: 10,
+        hint: 'Think about exposure.',
+      },
+      {
+        type: 'workflow-fix',
+        question: 'How should you verify npm packages?',
         choices: [
           'Check the download count',
           'Verify package checksums and use npm audit',
           'Only use popular packages',
           'Trust the package author',
         ],
-        hint: 'Think about supply chain security.',
-        explanation:
-          'Using npm audit and verifying package checksums helps detect compromised or malicious packages. Download count and author trust are not reliable indicators of security.',
-        correctChoice: 1,
+        correctIndex: 1,
+        points: 15,
+        workflowCode: `name: Verify NPM Packages{NEWLINE}on: [push]{NEWLINE}jobs:{NEWLINE}{TAB}audit:{NEWLINE}{TAB}{TAB}runs-on: ubuntu-latest{NEWLINE}{TAB}{TAB}steps:{NEWLINE}{TAB}{TAB}{TAB}- uses: actions/checkout@v3{NEWLINE}{TAB}{TAB}{TAB}- name: Install dependencies{NEWLINE}{TAB}{TAB}{TAB}{TAB}run: npm ci{NEWLINE}{TAB}{TAB}{TAB}- name: Audit packages{NEWLINE}{TAB}{TAB}{TAB}{TAB}run: npm audit --audit-level=high`,
+        hint: 'Supply chain security.',
+      },
+      {
+        type: 'multiple-choice',
+        question: 'What is the best practice for managing action versions?',
+        choices: [
+          'Always use the @main tag',
+          'Pin to a specific commit hash',
+          'Use major version tags',
+          'Use release tags',
+        ],
+        correctIndex: 1,
         points: 10,
+        hint: 'Security and predictability.',
+      },
+      {
+        type: 'multiple-choice',
+        question: 'What is a common attack on CI/CD pipelines?',
+        choices: ['SQL injection', 'Pipeline poisoning', 'Phishing', 'DDoS'],
+        correctIndex: 1,
+        points: 10,
+        hint: 'Think about supply chain.',
       },
     ],
   },
   {
-    title: 'Workflow Security - Advanced',
-    description: 'Advanced security concepts for GitHub Actions workflows.',
-    category: 'security',
+    name: 'Pipeline Monitoring',
+    description: 'Monitoring and observability in CI/CD.',
     difficulty: 'advanced',
-    type: 'workflow-fix',
-    totalQuestions: 1,
-    estimatedTime: 15,
-    tags: ['secrets', 'permissions', 'supply-chain'],
+    courseModuleOrder: 2,
     questions: [
       {
-        order: 1,
-        title: 'Secure Third-Party Actions',
-        description:
-          'Secure this workflow that uses third-party actions without verification.',
+        type: 'multiple-choice',
+        question: 'What is observability?',
+        choices: [
+          'Ability to observe system state',
+          'A type of test',
+          'A deployment tool',
+          'A code review process',
+        ],
+        correctIndex: 0,
+        points: 10,
+        hint: 'It is about visibility.',
+      },
+      {
+        type: 'multiple-choice',
+        question: 'Which tool is used for monitoring pipelines?',
+        choices: ['Grafana', 'Jest', 'Webpack', 'Figma'],
+        correctIndex: 0,
+        points: 10,
+        hint: 'It is a dashboard tool.',
+      },
+      {
         type: 'workflow-fix',
-        vulnerableCode: `name: Deploy with Third Party
-on: push
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    permissions: write-all
-    steps:
-      - uses: actions/checkout@v3
-      - uses: some-vendor/deploy-action@main
-        with:
-          api-key: \${{ secrets.API_KEY }}
-          access-token: \${{ secrets.GITHUB_TOKEN }}`,
-        codeLanguage: 'yaml',
-        hint: 'Always pin to a specific commit hash for third-party actions. Use restricted permissions. Pass only necessary secrets.',
-        explanation:
-          'Using @main tag with third-party actions is dangerous - the action code can change at any time. Always pin to a specific commit hash. Additionally, restrict permissions and only pass the secrets that are absolutely necessary.',
-        correctCode: `name: Deploy with Third Party
-on: push
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v3
-      - uses: some-vendor/deploy-action@a1b2c3d4e5f6
-        with:
-          api-key: \${{ secrets.API_KEY }}`,
+        question: 'How can you detect failed builds quickly?',
+        choices: [
+          'Manual log review',
+          'Automated alerts',
+          'Wait for user report',
+          'Ignore failures',
+        ],
+        correctIndex: 1,
         points: 15,
+        workflowCode: `name: Detect Failed Builds{NEWLINE}on: [push]{NEWLINE}jobs:{NEWLINE}{TAB}build:{NEWLINE}{TAB}{TAB}runs-on: ubuntu-latest{NEWLINE}{TAB}{TAB}steps:{NEWLINE}{TAB}{TAB}{TAB}- uses: actions/checkout@v3{NEWLINE}{TAB}{TAB}{TAB}- name: Build{NEWLINE}{TAB}{TAB}{TAB}{TAB}run: npm run build{NEWLINE}{TAB}{TAB}{TAB}- name: Notify on Failure{NEWLINE}{TAB}{TAB}{TAB}{TAB}if: failure(){NEWLINE}{TAB}{TAB}{TAB}{TAB}uses: some/alert-action@v1`,
+        hint: 'Automation is key.',
+      },
+      {
+        type: 'multiple-choice',
+        question: 'What metric is most useful for pipeline health?',
+        choices: [
+          'Build duration',
+          'Number of developers',
+          'Code comments',
+          'UI color',
+        ],
+        correctIndex: 0,
+        points: 10,
+        hint: 'Think about speed.',
       },
     ],
   },
@@ -219,106 +279,66 @@ jobs:
 /**
  * Seed function to initialize quizzes in the database
  */
-async function seedQuizzes() {
-  console.log('🌱 Starting quiz seeding...');
+
+async function seedLearningData() {
+  console.log('🌱 Starting learning data seeding...');
 
   try {
-    // Clear existing data (optional - comment out to preserve)
-    console.log('🗑️  Clearing existing quiz data...');
-    await prisma.userQuizAnswer.deleteMany({});
+    // Clear existing data
+    console.log('🗑️  Clearing existing quiz and module data...');
     await prisma.userQuizProgress.deleteMany({});
-    await prisma.quizAnswer.deleteMany({});
     await prisma.quizQuestion.deleteMany({});
     await prisma.quiz.deleteMany({});
+    await prisma.courseModule.deleteMany({});
     console.log('✓ Existing data cleared');
 
-    // Create each quiz
-    for (const quizData of SAMPLE_QUIZZES) {
-      console.log(`\n📚 Creating quiz: "${quizData.title}"`);
-
-      const quiz = await prisma.quiz.create({
+    // Seed course modules
+    const moduleIdMap: Record<number, number> = {};
+    for (const mod of SAMPLE_COURSE_MODULES) {
+      const created = await prisma.courseModule.create({
         data: {
-          title: quizData.title,
-          description: quizData.description,
-          category: quizData.category,
-          difficulty: quizData.difficulty,
-          type: quizData.type,
-          totalQuestions: quizData.totalQuestions,
-          estimatedTime: quizData.estimatedTime,
-          tags: quizData.tags,
+          title: mod.title,
+          status: mod.status,
+          length: mod.length,
+          icon: mod.icon,
+          order: mod.order,
         },
       });
+      moduleIdMap[mod.order] = created.id;
+      console.log(`✓ Course module seeded: ${mod.title}`);
+    }
 
-      console.log(`  ✓ Quiz created with ID: ${quiz.id}`);
-
-      // Create questions for this quiz
-      for (const questionData of quizData.questions) {
-        const question = await prisma.quizQuestion.create({
+    // Seed quizzes and questions
+    for (const quiz of SAMPLE_QUIZZES) {
+      const createdQuiz = await prisma.quiz.create({
+        data: {
+          name: quiz.name,
+          description: quiz.description,
+          difficulty: quiz.difficulty,
+          courseModuleId: moduleIdMap[quiz.courseModuleOrder],
+        },
+      });
+      console.log(`  ✓ Quiz seeded: ${quiz.name}`);
+      for (const q of quiz.questions) {
+        await prisma.quizQuestion.create({
           data: {
-            quizId: quiz.id,
-            order: questionData.order,
-            title: questionData.title,
-            description: questionData.description,
-            type: questionData.type,
-            vulnerableCode: questionData.vulnerableCode || null,
-            codeLanguage: questionData.codeLanguage || null,
-            choices: (questionData.choices || []) as any,
-            hint: questionData.hint,
-            explanation: questionData.explanation,
+            quizId: createdQuiz.id,
+            type: q.type,
+            question: q.question,
+            choices: q.choices,
+            correctIndex: q.correctIndex,
+            points: q.points,
+            workflowCode: q.workflowCode || null,
+            hint: q.hint || null,
           },
         });
-
-        console.log(
-          `    ✓ Question ${questionData.order}: "${questionData.title}"`,
-        );
-
-        // Create answer for this question - type-safe property access
-        let correctCode: string | null = null;
-        let correctChoice: number | null = null;
-        let acceptableAnswers: string[] = [];
-
-        if (
-          questionData.type === 'workflow-fix' &&
-          'correctCode' in questionData
-        ) {
-          correctCode = (questionData as any).correctCode;
-        } else if (
-          questionData.type === 'multiple-choice' &&
-          'correctChoice' in questionData
-        ) {
-          correctChoice = (questionData as any).correctChoice;
-        } else if (
-          questionData.type === 'short-answer' &&
-          'acceptableAnswers' in questionData
-        ) {
-          acceptableAnswers = (questionData as any).acceptableAnswers || [];
-        }
-
-        const answer = await prisma.quizAnswer.create({
-          data: {
-            questionId: question.id,
-            correctCode,
-            correctChoice,
-            acceptableAnswers: acceptableAnswers as any,
-            points: questionData.points,
-          },
-        });
-
-        console.log(
-          `      ✓ Answer created with ${questionData.points} points`,
-        );
+        console.log(`    ✓ Question: ${q.question}`);
       }
     }
 
-    console.log(
-      `\n✅ Successfully seeded ${SAMPLE_QUIZZES.length} quizzes with ${SAMPLE_QUIZZES.reduce((sum, q) => sum + q.questions.length, 0)} questions total!`,
-    );
-    console.log('\n📊 Summary:');
-    console.log(`  - Security quizzes: 2`);
-    console.log(`  - Best practices quizzes: 1`);
-    console.log(`  - Beginner: 1, Intermediate: 1, Advanced: 1`);
+    console.log(`{NEWLINE}✅ Successfully seeded quizzes and questions!`);
   } catch (error) {
-    console.error('❌ Error seeding quizzes:', error);
+    console.error('❌ Error seeding learning data:', error);
     throw error;
   } finally {
     await prisma.$disconnect();
@@ -328,9 +348,9 @@ async function seedQuizzes() {
 /**
  * Run the seed function
  */
-seedQuizzes()
+seedLearningData()
   .then(() => {
-    console.log('\n🎉 Seeding completed successfully!');
+    console.log('{NEWLINE}🎉 Seeding completed successfully!');
     process.exit(0);
   })
   .catch((error) => {
