@@ -1,27 +1,30 @@
+// DTO for submitting an answer
 export interface SubmitAnswerDto {
-  questionId: string;
-  submittedCode?: string; // For workflow-fix type
-  submittedChoice?: number; // For multiple-choice type (0-based index)
-  submittedText?: string; // For short-answer type
+  questionId: number;
+  selectedIndex: number;
 }
 
-export interface CheckAnswersDto {
-  answers: SubmitAnswerDto[];
-}
-
-export interface AnswerCheckResult {
-  questionId: string;
+// DTO for update progress response
+export interface UpdateProgressResponseDto {
+  questionId: number;
   isCorrect: boolean;
-  pointsEarned: number;
-  explanation: string; // Show explanation after checking
+  mark: number;
+  correctIndex: number;
 }
 
-export interface CheckAnswersResponseDto {
-  quizId: string;
-  results: AnswerCheckResult[];
+// DTO for user progress summary
+export interface UserQuizProgressDto {
+  questionId: number;
+  quizId: number;
+  mark: number;
+  isCorrect: boolean;
+}
+
+export interface UserProgressSummaryDto {
+  userId: string;
+  totalQuestions: number;
   totalMarks: number;
-  totalPossibleMarks: number;
-  percentage: number;
-  status: string; // 'completed', 'partial'
-  message: string;
+  byCourse: Array<{ courseModuleId: number; marks: number; questions: number }>;
+  byQuiz: Array<{ quizId: number; marks: number; questions: number }>;
+  questions: UserQuizProgressDto[];
 }

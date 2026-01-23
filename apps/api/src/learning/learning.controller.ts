@@ -1,213 +1,58 @@
 import {
   Controller,
   Get,
-  Post,
-  Query,
   Param,
+  Query,
+  Post,
   Body,
-  BadRequestException,
-  HttpStatus,
+  Delete,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
 import { LearningService } from './learning.service';
-import {
-  LoadQuizzesQuery,
-  type LoadQuizzesResponseDto,
-} from './dto/load-quizzes.dto';
-import type {
-  CheckAnswersDto,
-  CheckAnswersResponseDto,
-} from './dto/check-answers.dto';
+import type { SubmitAnswerDto } from './dto/check-answers.dto';
+import { AuthGuard } from '@nestjs/passport';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
 @Controller('learning')
 export class LearningController {
-  constructor(private readonly learningService: LearningService) {}
+  constructor(private readonly service: LearningService) {}
 
-  /**
-   * GET /learning/quizzes
-   * Load all available quizzes with optional filtering
-   *
-   * Query Parameters:
-   * - category: Filter by category (security, best-practices, etc.)
-   * - difficulty: Filter by difficulty (beginner, intermediate, advanced)
-   * - type: Filter by type (workflow-fix, multiple-choice, etc.)
-   * - userId: (Optional) To include user's progress on each quiz
-   *
-   * @example
-   * GET /learning/quizzes?userId=user123&difficulty=beginner
-   */
-  @Get('quizzes')
-  async loadQuizzes(
-    @Query('category') category?: string,
-    @Query('difficulty') difficulty?: string,
-    @Query('type') type?: string,
-    @Query('userId') userId?: string,
-  ): Promise<{
-    statusCode: number;
-    message: string;
-    data: LoadQuizzesResponseDto;
-  }> {
-    try {
-      const query: LoadQuizzesQuery = {
-        category,
-        difficulty,
-        type,
-        userId,
-      };
-
-      const data = await this.learningService.loadQuizzes(query);
-
-      return {
-        statusCode: HttpStatus.OK,
-        message: `Loaded ${data.quizzes.length} quizzes`,
-        data,
-      };
-    } catch (error) {
-      throw new BadRequestException('Failed to load quizzes: ' + error.message);
-    }
+  // 1. Get modules with quizzes (no questions)
+  @UseGuards(JwtAuthGuard)
+  @Get('modules')
+  async getModulesWithQuizzes() {
+    return this.service.getModulesWithQuizzes();
   }
 
-  /**
-   * POST /learning/quizzes/:quizId/start
-   * Initialize/start a quiz for a user
-   *
-   * @param quizId - The quiz ID to start
-   * @param userId - User ID (required in query)
-   *
-   * @example
-   * POST /learning/quizzes/quiz123/start?userId=user123
-   */
-  @Post('quizzes/:quizId/start')
-  async startQuiz(
-    @Param('quizId') quizId: string,
-    @Query('userId') userId: string,
-  ): Promise<{
-    statusCode: number;
-    message: string;
-    data: any;
-  }> {
-    try {
-      if (!userId) {
-        throw new BadRequestException('userId is required');
-      }
-
-      const data = await this.learningService.getQuizForTaking(quizId, userId);
-
-      return {
-        statusCode: HttpStatus.OK,
-        message: 'Quiz started successfully',
-        data,
-      };
-    } catch (error) {
-      throw new BadRequestException('Failed to start quiz: ' + error.message);
-    }
+  // 2. Get quiz with questions+answers
+  @UseGuards(JwtAuthGuard)
+  @Get('quiz/:quizId')
+  async getQuiz(@Param('quizId') quizId: string) {
+    return this.service.getQuiz(Number(quizId));
   }
 
-  /**
-   * POST /learning/quizzes/:quizId/check-answers
-   * Check user's answers and return scoring
-   *
-   * @param quizId - The quiz ID being submitted
-   * @param userId - User ID (required in query)
-   * @param checkAnswersDto - Array of answers with questionId and user's response
-   *
-   * @example
-   * POST /learning/quizzes/quiz123/check-answers?userId=user123
-   * Body:
-   * {
-   *   "answers": [
-   *     {
-   *       "questionId": "q1",
-   *       "submittedCode": "# fixed workflow code"
-   *     },
-   *     {
-   *       "questionId": "q2",
-   *       "submittedChoice": 1
-   *     }
-   *   ]
-   * }
-   */
-  @Post('quizzes/:quizId/check-answers')
-  async checkAnswers(
-    @Param('quizId') quizId: string,
-    @Query('userId') userId: string,
-    @Body() checkAnswersDto: CheckAnswersDto,
-  ): Promise<{
-    statusCode: number;
-    message: string;
-    data: CheckAnswersResponseDto;
-  }> {
-    try {
-      if (!userId) {
-        throw new BadRequestException('userId is required');
-      }
-
-      if (!checkAnswersDto.answers || checkAnswersDto.answers.length === 0) {
-        throw new BadRequestException('At least one answer must be submitted');
-      }
-
-      const data = await this.learningService.checkAnswers(
-        userId,
-        quizId,
-        checkAnswersDto,
-      );
-
-      return {
-        statusCode: HttpStatus.OK,
-        message: data.message,
-        data,
-      };
-    } catch (error) {
-      throw error instanceof BadRequestException
-        ? error
-        : new BadRequestException('Failed to check answers: ' + error.message);
-    }
+  // 3. Update user progress (submit answer for a question)
+  @UseGuards(JwtAuthGuard)
+  @Post('progress')
+  async updateUserProgress(@Req() req, @Body() dto: SubmitAnswerDto) {
+    const userId = req.user.id;
+    return this.service.updateUserProgress(userId, dto);
   }
 
-  /**
-   * POST /learning/quizzes/:quizId/reattempt
-   * Reset quiz progress to allow reattempting
-   *
-   * @param quizId - The quiz ID to reattempt
-   * @param userId - User ID (required in query)
-   */
-  @Post('quizzes/:quizId/reattempt')
-  async reattemptQuiz(
-    @Param('quizId') quizId: string,
-    @Query('userId') userId: string,
-  ): Promise<{
-    statusCode: number;
-    message: string;
-    data: any;
-  }> {
-    try {
-      if (!userId) {
-        throw new BadRequestException('userId is required');
-      }
-
-      const data = await this.learningService.reattemptQuiz(userId, quizId);
-
-      return {
-        statusCode: HttpStatus.OK,
-        message: data.message,
-        data,
-      };
-    } catch (error) {
-      throw error instanceof BadRequestException
-        ? error
-        : new BadRequestException('Failed to reattempt quiz: ' + error.message);
-    }
+  // 4. Get user progress summary
+  @UseGuards(JwtAuthGuard)
+  @Get('progress')
+  async getUserProgress(@Req() req) {
+    const userId = req.user.id;
+    return this.service.getUserProgress(userId);
   }
 
-  /**
-   * GET /learning/health
-   * Health check endpoint for learning service
-   */
-  @Get('health')
-  healthCheck() {
-    return {
-      statusCode: HttpStatus.OK,
-      message: 'Learning service is running',
-      timestamp: new Date().toISOString(),
-    };
+  // 5. Re-attempt (reset all progress for user)
+  @UseGuards(JwtAuthGuard)
+  @Delete('progress')
+  async resetUserProgress(@Req() req) {
+    const userId = req.user.id;
+    return this.service.resetUserProgress(userId);
   }
 }

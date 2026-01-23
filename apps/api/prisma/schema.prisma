@@ -1,3 +1,22 @@
+// ============================================
+// Learning Course Modules
+// ============================================
+
+model CourseModule {
+  id        Int      @id @default(autoincrement())
+  title     String
+  status    String   // 'Completed', 'In Progress', 'Not Started'
+  length    String   // e.g. '15 mins'
+  icon      String   // e.g. '🎯'
+  order     Int      // For ordering modules in UI
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  quizzes   Quiz[]
+
+  @@unique([title])
+  @@index([order])
+}
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,13 +27,30 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+model User {
+  id         String   @id // Supabase User ID (UUID)
+  email      String   @unique
+  fullName   String?
+  bio        String?
+  avatar     String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  organizationMemberships OrganizationMembership[]
+  membershipRequests MembershipRequest[]
+}
+
 model Project {
   id            String     @id @default(uuid())
   name          String
-  provider      String     // e.g., 'github', 'gitlab'
+  provider      String     // 'github', 'gitlab', etc.
   repositoryUrl String
   pipelines     Pipeline[]
   userId        String     // Supabase Auth User ID
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  githubRepositories GitHubRepository[] // If provider is 'github', link to GitHubRepository
+  // For future: gitlabRepositories GitLabRepository[]
   createdAt     DateTime   @default(now())
 }
 
@@ -115,6 +151,8 @@ model GitHubRepository {
   id             String             @id @default(uuid())
   installationId String
   installation   GitHubInstallation @relation(fields: [installationId], references: [id], onDelete: Cascade)
+  projectId      String?
+  project        Project?           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   repositoryId   String             // GitHub repo ID
   name           String             // Repo name
   fullName       String             // owner/repo
@@ -126,6 +164,7 @@ model GitHubRepository {
   @@unique([installationId, repositoryId])
   @@index([installationId])
   @@index([repositoryId])
+  @@index([projectId])
 }
 
 model WorkflowAnalysisCache {
@@ -159,132 +198,85 @@ model WorkflowAnalysisCache {
 }
 
 // ============================================
-// Learning Platform Models
+// Learning Platform Models (Simplified)
 // ============================================
 
 model Quiz {
-  id              String   @id @default(uuid())
-  title           String
-  description     String   @db.Text
-  category        String   // 'security', 'best-practices', 'optimization', etc.
-  difficulty      String   // 'beginner', 'intermediate', 'advanced'
-  type            String   // 'workflow-fix', 'multiple-choice', 'code-review'
-  totalQuestions  Int
-  estimatedTime   Int      // in minutes
-  tags            String[] // e.g., ['secrets', 'permissions', 'dependencies']
-
-  questions       QuizQuestion[]
-  userProgress    UserQuizProgress[]
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([category])
-  @@index([difficulty])
-  @@index([type])
+  id            Int      @id @default(autoincrement())
+  name          String
+  description   String   @db.Text
+  difficulty    String   // 'beginner', 'intermediate', 'advanced'
+  courseModule  CourseModule @relation(fields: [courseModuleId], references: [id], onDelete: Cascade)
+  courseModuleId Int
+  questions     QuizQuestion[]
 }
 
 model QuizQuestion {
-  id              String   @id @default(uuid())
-  quizId          String
-  quiz            Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  
-  order           Int      // Question number in quiz
-  title           String
-  description     String   @db.Text
-  type            String   // 'workflow-fix', 'multiple-choice', 'short-answer'
-  
-  // For workflow-fix type
-  vulnerableCode  String?  @db.Text // The vulnerable workflow YAML
-  codeLanguage    String?  // 'yaml', 'json', etc.
-  
-  // For multiple-choice type
-  choices         String[] // Array of choice options
-  
-  hint            String?  @db.Text
-  explanation     String   @db.Text // Explanation shown after answering
-  
-  answers         QuizAnswer[]
-  userAnswers     UserQuizAnswer[]
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id            Int      @id @default(autoincrement())
+  quiz          Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  quizId        Int
+  type          String   // 'multiple-choice', 'workflow-fix'
+  question      String   @db.Text
+  choices       String[] // For multiple choice and workflow-fix (as options)
+  correctIndex  Int      // Index in choices array (for both types)
+  points        Int      // Points for this question
+  workflowCode  String?  @db.Text // For workflow-fix type
+  hint          String?  @db.Text
 
-  @@unique([quizId, order])
-  @@index([quizId])
-}
-
-model QuizAnswer {
-  id              String   @id @default(uuid())
-  questionId      String
-  question        QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  
-  // For workflow-fix type - the correct fixed code
-  correctCode     String?  @db.Text
-  
-  // For multiple-choice type - the correct choice index
-  correctChoice   Int?
-  
-  // For short-answer type - list of acceptable answers
-  acceptableAnswers String[] // Can have multiple valid answers
-  
-  points          Int      // Points awarded for correct answer (default 10)
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@unique([questionId])
-  @@index([questionId])
+  userProgress  UserQuizProgress[]
 }
 
 model UserQuizProgress {
-  id              String   @id @default(uuid())
-  userId          String   // Supabase Auth User ID
-  quizId          String
-  quiz            Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  
-  status          String   // 'not-started', 'in-progress', 'completed'
-  progress        Int      // Percentage or question number (0-100 or 0-totalQuestions)
-  marks           Int      // Total marks scored
-  totalMarks      Int      // Total possible marks
-  
-  currentQuestion Int?     // Current question being answered (for resuming)
-  attemptCount    Int      @default(0) // Number of times quiz was attempted
-  
-  startedAt       DateTime?
-  completedAt     DateTime?
-  
-  answers         UserQuizAnswer[]
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id         Int    @id @default(autoincrement())
+  userId     String // Supabase Auth User ID
+  question   QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  questionId Int
+  mark       Int
+  // Add timestamp if needed
+}
 
-  @@unique([userId, quizId])
+// ============================================
+// Organization Management Models
+// ============================================
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  domain    String
+  members   OrganizationMembership[]
+  requests  MembershipRequest[]
+  projects  Project[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([domain])
+}
+
+model OrganizationMembership {
+  id             String   @id @default(uuid())
+  organizationId String
+  userId         String
+  role           String   // 'owner', 'admin', 'member'
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
   @@index([userId])
-  @@index([quizId])
-  @@index([status])
 }
 
-model UserQuizAnswer {
-  id              String   @id @default(uuid())
-  progressId      String
-  progress        UserQuizProgress @relation(fields: [progressId], references: [id], onDelete: Cascade)
-  
-  questionId      String
-  question        QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  
-  // User's submitted answer
-  submittedCode   String?  @db.Text // For workflow-fix type
-  submittedChoice Int?             // For multiple-choice type
-  submittedText   String?  @db.Text // For short-answer type
-  
-  isCorrect       Boolean
-  pointsEarned    Int      @default(0)
-  
-  submittedAt     DateTime @default(now())
+model MembershipRequest {
+  id             String   @id @default(uuid())
+  organizationId String
+  userId         String
+  status         String   // 'Comming Soon', 'Available', 'Paused'
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  @@unique([progressId, questionId])
-  @@index([progressId])
-  @@index([questionId])
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
 }
-

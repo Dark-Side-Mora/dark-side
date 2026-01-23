@@ -306,7 +306,20 @@ export class GithubAppService {
   /**
    * Get user's installations with repositories
    */
-  async getUserInstallations(userId: string) {
+  async getUserInstallations(userId: string, includeRepos: boolean = false) {
+    // get installation ids
+    const installations_prev = await this.prisma.gitHubInstallation.findMany({
+      where: { userId },
+      include: {
+        repositories: true,
+      },
+    });
+    // sync
+    for (const inst of installations_prev) {
+      await this.syncInstallationRepositories(inst.id);
+    }
+
+    // fetch from database
     const installations = await this.prisma.gitHubInstallation.findMany({
       where: { userId },
       include: {
@@ -316,6 +329,21 @@ export class GithubAppService {
         installedAt: 'desc',
       },
     });
+
+    const projects = await this.prisma.project.findMany({
+      where: { userId, provider: 'github' },
+    });
+
+    // filter the repos with projects
+    if (!includeRepos) {
+      for (const inst of installations) {
+        inst.repositories = inst.repositories.filter((repo) =>
+          projects.some(
+            (proj) => proj.repositoryUrl === repo.fullName.toString(),
+          ),
+        );
+      }
+    }
 
     return installations;
   }

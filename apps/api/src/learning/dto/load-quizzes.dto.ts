@@ -5,34 +5,27 @@ export interface LoadQuizzesQuery {
   userId?: string;
 }
 
-export interface QuestionDto {
-  id: string;
-  order: number;
-  title: string;
-  description: string;
-  type: string; // 'workflow-fix', 'multiple-choice', 'short-answer'
-  vulnerableCode?: string; // For workflow-fix type
-  codeLanguage?: string;
-  choices?: string[]; // For multiple-choice type
+export interface QuizQuestionDto {
+  id: number;
+  type: string;
+  question: string;
+  choices: string[];
+  correctIndex?: number; // Only for admin or after answer
+  points: number;
+  workflowCode?: string;
   hint?: string;
-  // Note: explanation is NOT sent initially, only after quiz completion
 }
 
 export interface QuizDto {
-  id: string;
-  title: string;
+  id: number;
+  name: string;
   description: string;
-  category: string;
   difficulty: string;
-  type: string;
-  totalQuestions: number;
-  estimatedTime: number;
-  tags: string[];
-  questions: QuestionDto[];
+  questions: QuizQuestionDto[];
 }
 
 export interface QuizProgressDto {
-  quizId: string;
+  quizId: number;
   status: string; // 'not-started', 'in-progress', 'completed'
   progress: number; // Percentage
   marks: number;
@@ -44,5 +37,5 @@ export interface QuizProgressDto {
 
 export interface LoadQuizzesResponseDto {
   quizzes: QuizDto[];
-  progress?: { [quizId: string]: QuizProgressDto };
+  progress?: { [quizId: number]: QuizProgressDto };
 }
