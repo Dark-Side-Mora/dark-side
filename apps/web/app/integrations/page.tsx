@@ -418,6 +418,52 @@ export default function IntegrationsPage() {
                 {jenkinsSetup.endpoint}
               </div>
             </div>
+            <div style={{ marginBottom: "32px" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  color: "var(--accent-cyan)",
+                  textTransform: "uppercase",
+                  marginBottom: "12px",
+                }}
+              >
+                How to use (Jenkins Pipeline)
+              </label>
+              <div
+                style={{
+                  padding: "16px",
+                  backgroundColor: "rgba(0,0,0,0.4)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "12px",
+                  fontFamily: "monospace",
+                  fontSize: "12px",
+                  lineHeight: "1.5",
+                  color: "var(--text-secondary)",
+                  overflowX: "auto",
+                  whiteSpace: "pre",
+                }}
+              >
+                {`node {
+  stage('Push to CI-Insight') {
+    script {
+      def payload = [
+        repository: "your-repo-name",
+        status: currentBuild.currentResult ?: "SUCCESS",
+        buildNumber: env.BUILD_NUMBER,
+        workflowContent: readFile('Jenkinsfile'),
+        jobs: [[name: "Build", status: "SUCCESS", logs: "Done"]]
+      ]
+      writeFile file: 'payload.json', text: groovy.json.JsonOutput.toJson(payload)
+      sh "curl -X POST -H 'Content-Type: application/json' \\
+          -H 'x-ci-insight-token: ${jenkinsSetup.token}' \\
+          -d @payload.json ${jenkinsSetup.endpoint}"
+    }
+  }
+}`}
+              </div>
+            </div>
 
             <Button
               variant="primary"
