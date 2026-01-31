@@ -77,8 +77,13 @@ export function useGithubPipeline(userId: string) {
             fullName: r.fullName,
           })),
         );
-        setRepos(allRepos);
-        if (allRepos.length > 0) setSelectedRepo(allRepos[0].fullName);
+        // Deduplicate by fullName (same repo might be in multiple installations)
+        const uniqueRepos = Array.from(
+          new Map(allRepos.map((r: any) => [r.fullName, r])).values(),
+        ) as { id: string; fullName: string }[];
+        setRepos(uniqueRepos);
+        if (uniqueRepos.length > 0 && !selectedRepo)
+          setSelectedRepo(uniqueRepos[0]?.fullName || "");
       } else {
         setRepos([]);
       }
@@ -94,6 +99,7 @@ export function useGithubPipeline(userId: string) {
     async (repo?: string) => {
       if (!repo && !selectedRepo) return;
       setLoading(true);
+      setPipelineData(null); // Clear stale data immediately
       setMessage("");
       try {
         const encodedRepo = encodeURIComponent(repo || selectedRepo);

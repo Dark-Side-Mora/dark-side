@@ -60,9 +60,6 @@ export class GithubAppService {
     }
   }
 
-  /**
-   * Generate GitHub App OAuth authorization URL (to get user token and fetch installations)
-   */
   generateAuthorizationUrl(userId: string, redirectUri?: string): string {
     const state = Buffer.from(JSON.stringify({ userId, redirectUri })).toString(
       'base64',
@@ -78,9 +75,6 @@ export class GithubAppService {
     return `https://github.com/login/oauth/authorize?${params.toString()}`;
   }
 
-  /**
-   * Generate GitHub App installation URL (direct install, but won't fetch installations without OAuth)
-   */
   generateInstallationUrl(userId: string, redirectUri?: string): string {
     const state = Buffer.from(JSON.stringify({ userId, redirectUri })).toString(
       'base64',
@@ -93,15 +87,11 @@ export class GithubAppService {
     return `https://github.com/apps/${this.configService.get<string>('GITHUB_APP_NAME')}/installations/new?${params.toString()}`;
   }
 
-  /**
-   * Handle installation callback - exchange code for access token
-   */
   async handleInstallationCallback(code: string, state: string) {
     const { userId, redirectUri } = JSON.parse(
       Buffer.from(state, 'base64').toString('utf8'),
     );
 
-    // Exchange code for user access token
     const tokenResponse = await firstValueFrom(
       this.httpService.post(
         'https://github.com/login/oauth/access_token',
@@ -119,11 +109,8 @@ export class GithubAppService {
     );
 
     const accessToken = tokenResponse.data.access_token;
-
-    // Get user's installations
     const installations = await this.fetchUserInstallations(accessToken);
 
-    // Store installations in database
     for (const installation of installations) {
       await this.storeInstallation(userId, installation, accessToken);
     }
@@ -131,9 +118,6 @@ export class GithubAppService {
     return { userId, redirectUri, installations };
   }
 
-  /**
-   * Fetch user's GitHub App installations
-   */
   async fetchUserInstallations(
     accessToken: string,
   ): Promise<GitHubAppInstallation[]> {
@@ -147,19 +131,26 @@ export class GithubAppService {
         }),
       );
 
+      console.log(
+        `[GithubAppService] Fetched ${response.data.installations?.length || 0} installations from GitHub`,
+      );
       return response.data.installations || [];
     } catch (error) {
       console.error(
         'Failed to fetch installations:',
         error.response?.data || error.message,
       );
+
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        throw new BadRequestException(
+          'GitHub token invalid or expired. Please reconnect your GitHub account.',
+        );
+      }
+
       throw new InternalServerErrorException('Failed to fetch installations');
     }
   }
 
-  /**
-   * Get installation access token for API calls
-   */
   async getInstallationAccessToken(installationId: string): Promise<string> {
     try {
       const octokit = new Octokit({
@@ -167,7 +158,6 @@ export class GithubAppService {
         auth: {
           appId: this.GITHUB_APP_ID,
           privateKey: this.GITHUB_APP_PRIVATE_KEY.replace(/\\n/g, '\n'),
-          installationId: parseInt(installationId),
         },
       });
 
@@ -187,9 +177,6 @@ export class GithubAppService {
     }
   }
 
-  /**
-   * Fetch repositories for an installation
-   */
   async fetchInstallationRepositories(
     installationId: string,
   ): Promise<GitHubRepository[]> {
@@ -209,9 +196,6 @@ export class GithubAppService {
     }
   }
 
-  /**
-   * Store installation in database
-   */
   async storeInstallation(
     userId: string,
     installation: GitHubAppInstallation,
@@ -219,7 +203,6 @@ export class GithubAppService {
   ) {
     const encryptedToken = this.encryptToken(userAccessToken);
 
-    // Create or update connection
     const connection = await this.prisma.integrationConnection.upsert({
       where: {
         userId_provider: {
@@ -240,43 +223,158 @@ export class GithubAppService {
       },
     });
 
-    // Store installation
-    const installationRecord = await this.prisma.gitHubInstallation.upsert({
+    console.log(`[GithubAppService] Connected GitHub App for user ${userId}`);
+    // Create or update installation
+    console.log(`[GithubAppService] Storing installation ${installation.id}`);
+
+    // Check if we need to fetch repositories from API
+    // This happens when repositories aren't included in the installation object (e.g. during sync)
+    let reposToStore: GitHubRepository[] = [];
+
+    // Check if installation.repositories exists and is an array (cast to any as it might not be in the type def)
+    const installAny = installation as any;
+    if (
+      installAny.repositories &&
+      Array.isArray(installAny.repositories) &&
+      installAny.repositories.length > 0
+    ) {
+      reposToStore = installAny.repositories as GitHubRepository[];
+    } else {
+      console.log(
+        `[GithubAppService] No internal repos found, fetching from API for installation ${installation.id}`,
+      );
+      try {
+        // Using the existing helper method
+        const fetchedRepos = await this.fetchInstallationRepositories(
+          installation.id.toString(),
+        );
+        reposToStore = fetchedRepos;
+        console.log(
+          `[GithubAppService] Fetched ${reposToStore.length} repositories from API`,
+        );
+      } catch (err) {
+        console.error(
+          `[GithubAppService] Failed to fetch repos for installation ${installation.id}:`,
+          err,
+        );
+      }
+    }
+
+    const installationRecord = await (
+      this.prisma.gitHubInstallation as any
+    ).upsert({
       where: {
         installationId: installation.id.toString(),
       },
       update: {
-        userId,
         connectionId: connection.id,
         accountId: installation.account.id.toString(),
         accountLogin: installation.account.login,
         accountType: installation.account.type,
         targetType: installation.account.type,
-        permissions: installation.permissions,
+        permissions: installation.permissions as any,
         repositorySelection: installation.repository_selection,
         status: installation.suspended_at ? 'suspended' : 'active',
         updatedAt: new Date(),
       },
       create: {
-        userId,
         connectionId: connection.id,
         installationId: installation.id.toString(),
         accountId: installation.account.id.toString(),
         accountLogin: installation.account.login,
         accountType: installation.account.type,
         targetType: installation.account.type,
-        permissions: installation.permissions,
+        permissions: installation.permissions as any,
         repositorySelection: installation.repository_selection,
         status: installation.suspended_at ? 'suspended' : 'active',
       },
     });
 
-    // Fetch and store repositories
-    const repositories = await this.fetchInstallationRepositories(
-      installation.id.toString(),
-    );
+    await (this.prisma as any).gitHubInstallationUser.upsert({
+      where: {
+        installationId_userId: {
+          installationId: installationRecord.id,
+          userId,
+        },
+      },
+      update: {},
+      create: {
+        installationId: installationRecord.id,
+        userId,
+      },
+    });
 
-    for (const repo of repositories) {
+    const orgName =
+      installation.account.type === 'Organization'
+        ? installation.account.login
+        : `${installation.account.login} (Personal)`;
+
+    let organization = await this.prisma.organization.findFirst({
+      where: {
+        name: orgName,
+        domain: 'github.com',
+      },
+    });
+
+    if (!organization) {
+      organization = await this.prisma.organization.create({
+        data: {
+          name: orgName,
+          domain: 'github.com',
+          members: {
+            create: {
+              userId,
+              role: 'owner',
+            },
+          },
+        },
+      });
+      console.log(
+        `[GithubAppService] Created new shared Organization: ${orgName}`,
+      );
+    } else {
+      // Ensure user is a member of this existing organization
+      await (this.prisma as any).organizationMembership.upsert({
+        where: {
+          organizationId_userId: {
+            organizationId: organization.id,
+            userId,
+          },
+        },
+        update: {}, // Keep existing role
+        create: {
+          organizationId: organization.id,
+          userId,
+          role: 'owner', // Default to owner if they are the one connecting
+        },
+      });
+      console.log(
+        `[GithubAppService] User is already a member of Organization: ${orgName}`,
+      );
+    }
+
+    // Create/update projects for each repository
+    for (const repo of reposToStore) {
+      // Check if project already exists
+      let project = await this.prisma.project.findFirst({
+        where: {
+          organizationId: organization.id,
+          repositoryUrl: repo.full_name,
+        },
+      });
+
+      if (!project) {
+        project = await this.prisma.project.create({
+          data: {
+            organizationId: organization.id,
+            userId,
+            name: repo.name,
+            provider: 'github',
+            repositoryUrl: repo.full_name,
+          },
+        });
+      }
+
       await this.prisma.gitHubRepository.upsert({
         where: {
           installationId_repositoryId: {
@@ -288,6 +386,7 @@ export class GithubAppService {
           name: repo.name,
           fullName: repo.full_name,
           private: repo.private,
+          projectId: project.id,
           updatedAt: new Date(),
         },
         create: {
@@ -296,6 +395,7 @@ export class GithubAppService {
           name: repo.name,
           fullName: repo.full_name,
           private: repo.private,
+          projectId: project.id,
         },
       });
     }
@@ -304,24 +404,158 @@ export class GithubAppService {
   }
 
   /**
-   * Get user's installations with repositories
+   * Sync a single installation by ID (used for direct installation callback)
    */
+  async syncInstallationById(installationId: string, userId: string) {
+    try {
+      console.log(
+        `[GithubAppService] Syncing installation ${installationId} for user ${userId}`,
+      );
+
+      // Get installation access token (for later use)
+      const accessToken = await this.getInstallationAccessToken(installationId);
+
+      // Fetch installation details using App Auth (JWT) - Required for this endpoint
+      const appOctokit = new Octokit({
+        authStrategy: createAppAuth,
+        auth: {
+          appId: this.GITHUB_APP_ID,
+          privateKey: this.GITHUB_APP_PRIVATE_KEY.replace(/\\n/g, '\n'),
+        },
+      });
+
+      const { data: installation } = await appOctokit.request(
+        'GET /app/installations/{installation_id}',
+        {
+          installation_id: parseInt(installationId),
+        },
+      );
+
+      // Create Octokit instance with Installation Token for repository operations
+      const octokit = new Octokit({ auth: accessToken });
+
+      // Fetch repositories for this installation
+      const { data: reposData } = await octokit.request(
+        'GET /installation/repositories',
+        {
+          per_page: 100,
+        },
+      );
+
+      // Store the installation (this also creates organization and projects)
+      await this.storeInstallation(userId, installation as any, accessToken);
+
+      console.log(
+        `[GithubAppService] Successfully synced installation ${installationId} with ${reposData.repositories.length} repositories`,
+      );
+
+      const accountName =
+        installation.account && 'login' in installation.account
+          ? installation.account.login
+          : 'Unknown';
+
+      return {
+        installationId,
+        repositoryCount: reposData.repositories.length,
+        accountName,
+      };
+    } catch (error) {
+      console.error(
+        `[GithubAppService] Failed to sync installation ${installationId}:`,
+        error,
+      );
+      throw new InternalServerErrorException(
+        `Failed to sync installation: ${error.message}`,
+      );
+    }
+  }
+
   async getUserInstallations(userId: string, includeRepos: boolean = false) {
-    // get installation ids
-    const installations_prev = await this.prisma.gitHubInstallation.findMany({
-      where: { userId },
-      include: {
-        repositories: true,
+    // 1. Fetch currently known installations from DB
+    const existingInstallations = await (
+      this.prisma.gitHubInstallation as any
+    ).findMany({
+      where: {
+        users: { some: { userId } },
       },
     });
-    // sync
-    for (const inst of installations_prev) {
-      await this.syncInstallationRepositories(inst.id);
+
+    // 2. Robust Polling: Sync all known installations using App Auth (Private Key)
+    // This is extremely reliable as it doesn't depend on the user's OAuth token.
+    if (existingInstallations.length > 0) {
+      console.log(
+        `[GithubAppService] Polling ${existingInstallations.length} known installations for user ${userId}`,
+      );
+      for (const inst of existingInstallations) {
+        try {
+          await this.syncInstallationRepositories(inst.id);
+        } catch (error) {
+          console.error(
+            `[GithubAppService] Failed to poll installation ${inst.id}:`,
+            error.message,
+          );
+        }
+      }
     }
 
-    // fetch from database
-    const installations = await this.prisma.gitHubInstallation.findMany({
-      where: { userId },
+    // 3. Best-Effort Discovery: Attempt to find NEW installations using User OAuth token
+    const connection = await this.prisma.integrationConnection.findUnique({
+      where: {
+        userId_provider: {
+          userId,
+          provider: 'github-app',
+        },
+      },
+    });
+
+    if (
+      connection &&
+      connection.status === 'active' &&
+      connection.accessToken
+    ) {
+      try {
+        const accessToken = this.decryptToken(connection.accessToken);
+        console.log(
+          `[GithubAppService] Attempting best-effort discovery for user ${userId}`,
+        );
+
+        const githubInstallations =
+          await this.fetchUserInstallations(accessToken);
+        console.log(
+          `[GithubAppService] Found ${githubInstallations.length} installations from GitHub`,
+        );
+
+        for (const installation of githubInstallations) {
+          try {
+            await this.storeInstallation(userId, installation, accessToken);
+          } catch (error) {
+            console.error(
+              `[GithubAppService] Best-effort discovery failed for ${installation.id}:`,
+              error.message,
+            );
+          }
+        }
+      } catch (error) {
+        console.warn(
+          '[GithubAppService] Global discovery failed (best-effort):',
+          error.message,
+        );
+        // We stay silent here. Polling above already handled the ones we know.
+      }
+    } else {
+      console.log(
+        `[GithubAppService] No active connection found for user ${userId}`,
+      );
+    }
+
+    const installations = await (
+      this.prisma.gitHubInstallation as any
+    ).findMany({
+      where: {
+        users: {
+          some: { userId },
+        },
+      },
       include: {
         repositories: true,
       },
@@ -330,29 +564,13 @@ export class GithubAppService {
       },
     });
 
-    const projects = await this.prisma.project.findMany({
-      where: { userId, provider: 'github' },
-    });
-
-    // filter the repos with projects
-    if (!includeRepos) {
-      for (const inst of installations) {
-        inst.repositories = inst.repositories.filter((repo) =>
-          projects.some(
-            (proj) => proj.repositoryUrl === repo.fullName.toString(),
-          ),
-        );
-      }
-    }
-
     return installations;
   }
 
-  /**
-   * Sync installation repositories (refresh from GitHub)
-   */
   async syncInstallationRepositories(installationId: string) {
-    const installation = await this.prisma.gitHubInstallation.findUnique({
+    const installation = await (
+      this.prisma.gitHubInstallation as any
+    ).findUnique({
       where: { id: installationId },
     });
 
@@ -364,18 +582,97 @@ export class GithubAppService {
       installation.installationId,
     );
 
-    // Delete removed repositories
-    await this.prisma.gitHubRepository.deleteMany({
+    const users = await (this.prisma as any).gitHubInstallationUser.findMany({
+      where: { installationId },
+    });
+    const userId = users[0]?.userId;
+
+    if (!userId) {
+      throw new BadRequestException('No user linked to this installation');
+    }
+
+    const orgName = installation.accountLogin.includes('(Personal)')
+      ? installation.accountLogin
+      : installation.accountType === 'Organization'
+        ? installation.accountLogin
+        : `${installation.accountLogin} (Personal)`;
+
+    let organization = await this.prisma.organization.findFirst({
       where: {
-        installationId,
-        repositoryId: {
-          notIn: repositories.map((r) => r.id.toString()),
-        },
+        members: { some: { userId } },
+        name: orgName,
       },
     });
 
-    // Upsert current repositories
+    if (!organization) {
+      organization = await this.prisma.organization.create({
+        data: {
+          name: orgName,
+          domain: 'github.com',
+          members: { create: { userId, role: 'owner' } },
+        },
+      });
+    }
+
+    // Identify stale repositories that are in our DB but no longer on GitHub
+    const existingRepoIdStrings = new Set(
+      repositories.map((r) => r.id.toString()),
+    );
+    const staleRepos = await this.prisma.gitHubRepository.findMany({
+      where: {
+        installationId,
+        repositoryId: { notIn: Array.from(existingRepoIdStrings) },
+      },
+    });
+
+    if (staleRepos.length > 0) {
+      console.log(
+        `[GithubAppService] Pruning ${staleRepos.length} stale repositories for installation ${installationId}`,
+      );
+      for (const stale of staleRepos) {
+        if (stale.projectId) {
+          // Deleting the project will cascade down to Pipelines, Jobs, Findings AND the GitHubRepository record itself
+          await this.prisma.project
+            .delete({
+              where: { id: stale.projectId },
+            })
+            .catch((err) =>
+              console.error(
+                `[GithubAppService] Failed to delete stale project ${stale.projectId}:`,
+                err.message,
+              ),
+            );
+        } else {
+          // If no project, just delete the repo record
+          await this.prisma.gitHubRepository
+            .delete({
+              where: { id: stale.id },
+            })
+            .catch(() => {});
+        }
+      }
+    }
+
     for (const repo of repositories) {
+      let project = await this.prisma.project.findFirst({
+        where: {
+          organizationId: organization.id,
+          repositoryUrl: repo.full_name,
+        },
+      });
+
+      if (!project) {
+        project = await this.prisma.project.create({
+          data: {
+            organizationId: organization.id,
+            userId,
+            name: repo.name,
+            provider: 'github',
+            repositoryUrl: repo.full_name,
+          },
+        });
+      }
+
       await this.prisma.gitHubRepository.upsert({
         where: {
           installationId_repositoryId: {
@@ -387,6 +684,7 @@ export class GithubAppService {
           name: repo.name,
           fullName: repo.full_name,
           private: repo.private,
+          projectId: project.id,
           updatedAt: new Date(),
         },
         create: {
@@ -395,6 +693,7 @@ export class GithubAppService {
           name: repo.name,
           fullName: repo.full_name,
           private: repo.private,
+          projectId: project.id,
         },
       });
     }
@@ -402,9 +701,6 @@ export class GithubAppService {
     return { synced: repositories.length };
   }
 
-  /**
-   * Handle installation webhook events
-   */
   async handleWebhookEvent(event: string, payload: any) {
     switch (event) {
       case 'installation':
@@ -417,24 +713,44 @@ export class GithubAppService {
   }
 
   private async handleInstallationEvent(payload: any) {
-    const { action, installation, sender } = payload;
+    const { action, installation } = payload;
 
     if (action === 'deleted') {
-      // Remove installation
-      await this.prisma.gitHubInstallation.updateMany({
+      const dbInstallation = await this.prisma.gitHubInstallation.findUnique({
         where: { installationId: installation.id.toString() },
-        data: { status: 'removed' },
+        include: { repositories: true },
       });
+
+      if (dbInstallation) {
+        console.log(
+          `[GithubAppService] App uninstalled. Deleting ${dbInstallation.repositories.length} projects.`,
+        );
+        for (const repo of dbInstallation.repositories) {
+          if (repo.projectId) {
+            await this.prisma.project
+              .delete({
+                where: { id: repo.projectId },
+              })
+              .catch(() => {});
+          }
+        }
+
+        await this.prisma.gitHubInstallation.update({
+          where: { id: dbInstallation.id },
+          data: { status: 'removed' },
+        });
+      }
     }
 
     return { processed: true };
   }
 
   private async handleInstallationRepositoriesEvent(payload: any) {
-    const { action, installation, repositories_added, repositories_removed } =
-      payload;
+    const { action, installation, repositories_added } = payload;
 
-    const installationRecord = await this.prisma.gitHubInstallation.findUnique({
+    const installationRecord = await (
+      this.prisma.gitHubInstallation as any
+    ).findUnique({
       where: { installationId: installation.id.toString() },
     });
 
@@ -444,38 +760,95 @@ export class GithubAppService {
     }
 
     if (action === 'added' && repositories_added) {
-      // Add new repositories
-      for (const repo of repositories_added) {
-        await this.prisma.gitHubRepository.create({
-          data: {
-            installationId: installationRecord.id,
-            repositoryId: repo.id.toString(),
-            name: repo.name,
-            fullName: repo.full_name,
-            private: repo.private,
+      const users = await (this.prisma as any).gitHubInstallationUser.findMany({
+        where: { installationId: installationRecord.id },
+      });
+      const userId = users[0]?.userId;
+
+      if (userId) {
+        const orgName =
+          installationRecord.accountType === 'Organization'
+            ? installationRecord.accountLogin
+            : `${installationRecord.accountLogin} (Personal)`;
+
+        let organization = await this.prisma.organization.findFirst({
+          where: {
+            members: { some: { userId } },
+            name: orgName,
           },
         });
+
+        if (!organization) {
+          organization = await this.prisma.organization.create({
+            data: {
+              name: orgName,
+              domain: 'github.com',
+              members: { create: { userId, role: 'owner' } },
+            },
+          });
+        }
+
+        for (const repo of repositories_added) {
+          let project = await this.prisma.project.findFirst({
+            where: {
+              organizationId: organization.id,
+              repositoryUrl: repo.full_name,
+            },
+          });
+
+          if (!project) {
+            project = await this.prisma.project.create({
+              data: {
+                organizationId: organization.id,
+                userId,
+                name: repo.name,
+                provider: 'github',
+                repositoryUrl: repo.full_name,
+              },
+            });
+          }
+
+          await this.prisma.gitHubRepository.create({
+            data: {
+              installationId: installationRecord.id,
+              repositoryId: repo.id.toString(),
+              name: repo.name,
+              fullName: repo.full_name,
+              private: repo.private,
+              projectId: project.id,
+            },
+          });
+        }
       }
     }
 
-    if (action === 'removed' && repositories_removed) {
-      // Remove repositories
-      for (const repo of repositories_removed) {
-        await this.prisma.gitHubRepository.deleteMany({
+    if (action === 'removed' && payload.repositories_removed) {
+      console.log(
+        `[GithubAppService] Repositories revoked via webhook. Pruning...`,
+      );
+      for (const repo of payload.repositories_removed) {
+        const repoRecord = await this.prisma.gitHubRepository.findUnique({
           where: {
-            installationId: installationRecord.id,
-            repositoryId: repo.id.toString(),
+            installationId_repositoryId: {
+              installationId: installationRecord.id,
+              repositoryId: repo.id.toString(),
+            },
           },
         });
+
+        if (repoRecord && repoRecord.projectId) {
+          await this.prisma.project
+            .delete({
+              where: { id: repoRecord.projectId },
+            })
+            .catch(() => {});
+        }
       }
     }
 
     return { processed: true };
   }
 
-  /**
-   * Encrypt token
-   */
   private encryptToken(token: string): string {
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv(
@@ -490,9 +863,6 @@ export class GithubAppService {
     return `${iv.toString('hex')}:${encrypted}`;
   }
 
-  /**
-   * Decrypt token
-   */
   private decryptToken(encryptedToken: string): string {
     const [ivHex, encrypted] = encryptedToken.split(':');
     const iv = Buffer.from(ivHex, 'hex');
@@ -508,24 +878,17 @@ export class GithubAppService {
     return decrypted;
   }
 
-  /**
-   * Get installation token for a specific repository
-   * This is used by pipeline services to authenticate API calls
-   */
   async getInstallationTokenForRepo(
     userId: string,
     repoFullName: string,
   ): Promise<{ token: string; installationId: string }> {
-    // Find the installation that has access to this repository
-    const installation = await this.prisma.gitHubInstallation.findFirst({
+    const installation = await (
+      this.prisma.gitHubInstallation as any
+    ).findFirst({
       where: {
-        userId,
+        users: { some: { userId } },
         status: 'active',
-        repositories: {
-          some: {
-            fullName: repoFullName,
-          },
-        },
+        repositories: { some: { fullName: repoFullName } },
       },
     });
 
@@ -535,7 +898,6 @@ export class GithubAppService {
       );
     }
 
-    // Get installation access token
     const token = await this.getInstallationAccessToken(
       installation.installationId,
     );
