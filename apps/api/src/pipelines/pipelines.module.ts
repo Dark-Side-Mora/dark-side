@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { GithubPipelineController } from './github/github-pipeline.controller';
 import { GithubPipelineService } from './github/github-pipeline.service';
+import { JenkinsPipelineService } from './jenkins-pipeline.service';
+import { PipelinesController } from './pipelines.controller';
 import { PipelineAnalysisService } from './services/pipeline-analysis.service';
 import { WorkflowAnalysisCacheService } from './services/workflow-analysis-cache.service';
 import { IntegrationsModule } from '../integrations/integrations.module';
@@ -14,12 +16,12 @@ import { PrismaService } from '../prisma/prisma.service';
     IntegrationsModule, // Import to use GithubAppService
     AIModule, // Import AI services for security analysis
   ],
-  controllers: [GithubPipelineController],
+  controllers: [GithubPipelineController, PipelinesController],
   providers: [
     GithubPipelineService,
+    JenkinsPipelineService,
     PipelineAnalysisService,
     WorkflowAnalysisCacheService,
-    PrismaService,
   ],
   exports: [
     GithubPipelineService,

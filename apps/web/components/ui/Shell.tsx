@@ -217,6 +217,38 @@ const IconMenu = () => (
   </svg>
 );
 
+const IconGitHub = () => (
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
+  </svg>
+);
+
+const IconJenkins = () => (
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 16v-4" />
+    <path d="M12 8h.01" />
+  </svg>
+);
+
 export const Shell = ({ children }: { children: React.ReactNode }) => {
   // Initialize from localStorage if available, default to true (dark mode)
   const router = useRouter();
@@ -250,6 +282,7 @@ export const Shell = ({ children }: { children: React.ReactNode }) => {
   const getActivePage = (path: string) => {
     if (path === "/") return "Dashboard";
     if (path.startsWith("/projects")) return "Projects";
+    if (path.startsWith("/integrations")) return "Integrations";
     if (path.startsWith("/explorer")) return "Run Explorer";
     if (path.startsWith("/security")) return "Security";
     if (path.startsWith("/learning")) return "Learning Hub";
@@ -377,6 +410,7 @@ export const Shell = ({ children }: { children: React.ReactNode }) => {
   const menuItems = [
     { name: "Dashboard", icon: <IconDashboard />, path: "/" },
     { name: "Projects", icon: <IconProjects />, path: "/projects" },
+    { name: "Integrations", icon: <IconIntegrations />, path: "/integrations" },
     { name: "Run Explorer", icon: <IconExplorer />, path: "/explorer" },
     { name: "Security", icon: <IconSecurity />, path: "/security" },
     { name: "Learning Hub", icon: <IconLearning />, path: "/learning" },
@@ -463,78 +497,118 @@ export const Shell = ({ children }: { children: React.ReactNode }) => {
           >
             Workspaces
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-            {organizations.map((org) => (
-              <div
-                key={org.id}
-                onClick={() => {
-                  selectOrganization(org.id);
-                  if (pathname !== "/projects") {
-                    router.push("/projects");
-                  }
-                }}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  padding: "8px 12px",
-                  borderRadius: "8px",
-                  cursor: "pointer",
-                  backgroundColor:
-                    currentOrgId === org.id
-                      ? "rgba(255, 255, 255, 0.05)"
-                      : "transparent",
-                  color:
-                    currentOrgId === org.id
-                      ? "var(--text-primary)"
-                      : "var(--text-secondary)",
-                  transition: "all 0.2s ease",
-                }}
-              >
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "16px" }}
+          >
+            {Object.entries(
+              organizations.reduce(
+                (acc, org) => {
+                  const provider = org.provider || "github";
+                  if (!acc[provider]) acc[provider] = [];
+                  acc[provider].push(org);
+                  return acc;
+                },
+                {} as Record<string, typeof organizations>,
+              ),
+            ).map(([provider, providerOrgs]) => (
+              <div key={provider}>
                 <div
                   style={{
-                    width: "20px",
-                    height: "20px",
-                    borderRadius: "4px",
-                    backgroundColor:
-                      currentOrgId === org.id
-                        ? "var(--accent-cyan)"
-                        : "var(--border)",
-                    color:
-                      currentOrgId === org.id
-                        ? "#000"
-                        : "var(--text-secondary)",
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center",
+                    gap: "8px",
+                    paddingLeft: "12px",
+                    marginBottom: "8px",
                     fontSize: "10px",
-                    fontWeight: 700,
+                    fontWeight: 800,
+                    color: "var(--accent-cyan)",
+                    textTransform: "uppercase",
                   }}
                 >
-                  {org.name.charAt(0).toUpperCase()}
+                  {provider === "github" ? <IconGitHub /> : <IconJenkins />}
+                  {provider}
                 </div>
-                <span
+                <div
                   style={{
-                    fontSize: "13px",
-                    fontWeight: 500,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "4px",
                   }}
                 >
-                  {org.name}
-                </span>
-                {currentOrgId === org.id && (
-                  <div
-                    style={{
-                      width: "6px",
-                      height: "6px",
-                      borderRadius: "50%",
-                      backgroundColor: "var(--accent-cyan)",
-                      marginLeft: "auto",
-                    }}
-                  />
-                )}
+                  {providerOrgs.map((org) => (
+                    <div
+                      key={org.id}
+                      onClick={() => {
+                        selectOrganization(org.id);
+                        if (pathname !== "/projects") {
+                          router.push("/projects");
+                        }
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        padding: "8px 12px",
+                        borderRadius: "8px",
+                        cursor: "pointer",
+                        backgroundColor:
+                          currentOrgId === org.id
+                            ? "rgba(255, 255, 255, 0.05)"
+                            : "transparent",
+                        color:
+                          currentOrgId === org.id
+                            ? "var(--text-primary)"
+                            : "var(--text-secondary)",
+                        transition: "all 0.2s ease",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: "20px",
+                          height: "20px",
+                          borderRadius: "4px",
+                          backgroundColor:
+                            currentOrgId === org.id
+                              ? "var(--accent-cyan)"
+                              : "var(--border)",
+                          color:
+                            currentOrgId === org.id
+                              ? "#000"
+                              : "var(--text-secondary)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "10px",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {org.name.charAt(0).toUpperCase()}
+                      </div>
+                      <span
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 500,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {org.name}
+                      </span>
+                      {currentOrgId === org.id && (
+                        <div
+                          style={{
+                            width: "6px",
+                            height: "6px",
+                            borderRadius: "50%",
+                            backgroundColor: "var(--accent-cyan)",
+                            marginLeft: "auto",
+                          }}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
             <div
@@ -811,3 +885,20 @@ export const Shell = ({ children }: { children: React.ReactNode }) => {
     </div>
   );
 };
+
+const IconIntegrations = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+    <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+    <line x1="12" y1="22.08" x2="12" y2="12" />
+  </svg>
+);

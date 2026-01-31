@@ -6,6 +6,7 @@ export interface Organization {
   name: string;
   domain: string;
   role: string;
+  provider?: string;
 }
 
 interface OrganizationContextType {

@@ -8,6 +8,8 @@ import { useOrganization } from "../../lib/organization/useOrganization";
 import { useProject } from "../../lib/project/useProject";
 import { useGithubApp } from "@/lib/project/useGithubApp";
 import { useProjectContext } from "@/lib/project/ProjectContext";
+import { CreateWorkspaceModal } from "@/components/project/CreateWorkspaceModal";
+import { useJenkins } from "@/lib/project/useJenkins";
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -25,6 +27,8 @@ export default function ProjectsPage() {
   const [isTokenExpired, setIsTokenExpired] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const { setCurrentProjectId, setRepositoryUrl } = useProjectContext();
+  const { createOrganization, loading: creatingOrg } = useOrganization();
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Prevent hydration mismatch
   useEffect(() => {
@@ -54,20 +58,8 @@ export default function ProjectsPage() {
     }
   }, [fetchOrganizations, fetchProjects, currentOrgId]);
 
-  const handleConnectClick = async () => {
-    setGithubLoading(true);
-    try {
-      const res = (await installGithubApp(
-        window.location.origin + "/projects",
-      )) as any;
-      if (res.data?.installationUrl) {
-        window.location.href = res.data.installationUrl;
-      }
-    } catch (err) {
-      alert("Redirection failed: " + (err as Error).message);
-    } finally {
-      setGithubLoading(false);
-    }
+  const handleConnectClick = () => {
+    router.push("/integrations");
   };
 
   const handleReconnectClick = async () => {
@@ -121,6 +113,19 @@ export default function ProjectsPage() {
       }
     } finally {
       if (!silent) setSyncLoading(false);
+    }
+  };
+
+  const handleManualCreate = async (
+    name: string,
+    domain: string,
+    provider: string,
+  ) => {
+    try {
+      await createOrganization(name, domain, provider);
+      await fetchOrganizations();
+    } catch (err) {
+      alert("Failed to create workspace: " + (err as Error).message);
     }
   };
 
@@ -187,6 +192,9 @@ export default function ProjectsPage() {
                 {githubLoading ? "Redirecting..." : "⚠️ Reconnect GitHub"}
               </Button>
             )}
+            <Button variant="secondary" onClick={() => setIsModalOpen(true)}>
+              Create Workspace
+            </Button>
             <Button onClick={handleConnectClick} disabled={githubLoading}>
               {githubLoading ? "Redirecting..." : "Add New Project"}
             </Button>
@@ -226,13 +234,21 @@ export default function ProjectsPage() {
               We'll automatically discover your organizations, personal
               workspaces, and repositories.
             </p>
-            <Button
-              onClick={handleConnectClick}
-              disabled={githubLoading}
-              style={{ padding: "16px 40px", fontSize: "16px" }}
-            >
-              {githubLoading ? "Redirecting..." : "Get Started with GitHub"}
-            </Button>
+            <div style={{ display: "flex", gap: "12px" }}>
+              <Button
+                onClick={handleConnectClick}
+                style={{ padding: "16px 40px", fontSize: "16px" }}
+              >
+                Get Started with GitHub
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setIsModalOpen(true)}
+                style={{ padding: "16px 40px", fontSize: "16px" }}
+              >
+                Create Manual Workspace
+              </Button>
+            </div>
           </div>
         ) : orgLoading || (projectLoading && projects.length === 0) ? (
           <div
@@ -429,6 +445,13 @@ export default function ProjectsPage() {
           </>
         )}
       </div>
+
+      <CreateWorkspaceModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onCreate={handleManualCreate}
+        loading={creatingOrg}
+      />
 
       <style jsx>{`
         .projects-grid {

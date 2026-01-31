@@ -8,6 +8,10 @@ export class CreateOrganizationDto {
   @IsString()
   @IsNotEmpty()
   domain: string;
+
+  @IsString()
+  @IsOptional()
+  provider?: string;
 }
 
 export class UpdateOrganizationDto {

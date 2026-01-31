@@ -78,13 +78,14 @@ export const useOrganization = () => {
 
   // Create organization
   const createOrganization = useCallback(
-    async (name: string, domain: string) => {
+    async (name: string, domain: string, provider: string = "github") => {
       setLoading(true);
       setError(null);
       try {
         const org = await apiPost<Organization>(`${API_URL}/organizations`, {
           name,
           domain,
+          provider,
         });
         setOrganizations([...organizations, org]);
         return org;

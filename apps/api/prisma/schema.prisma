@@ -66,6 +66,7 @@ model Pipeline {
   eventType        String?           // push, pull_request
   startedAt        DateTime?
   finishedAt       DateTime?
+  workflowContent  String?           @db.Text
   createdAt        DateTime          @default(now())
   jobs             Job[]
   securityFindings SecurityFinding[]
@@ -255,6 +256,7 @@ model UserQuizProgress {
 model Organization {
   id        String   @id @default(uuid())
   name      String
+  provider  String   @default("github") // 'github', 'jenkins', etc.
   domain    String
   members   OrganizationMembership[]
   requests  MembershipRequest[]
