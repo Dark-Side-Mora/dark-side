@@ -8,67 +8,31 @@ import { useJenkins } from "@/lib/project/useJenkins";
 import { useOrganization } from "@/lib/organization/useOrganization";
 
 const LogoGitHub = () => (
-  <svg
-    width="40"
-    height="40"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
-  </svg>
+  <img src="/github.webp" alt="GitHub" width="40" height="40" />
 );
 
 const LogoJenkins = () => (
-  <svg
+  <img
+    src="/jenkins.png"
+    alt="Jenkins"
     width="40"
     height="40"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <circle cx="12" cy="12" r="10" />
-    <path d="M12 16v-4" />
-    <path d="M12 8h.01" />
-  </svg>
+    style={{ objectFit: "contain" }}
+  />
 );
 
 const LogoGitLab = () => (
-  <svg
-    width="40"
-    height="40"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="m22 13.29-3.33-10a.42.42 0 0 0-.14-.18.38.38 0 0 0-.22-.11.39.39 0 0 0-.23.07.42.42 0 0 0-.14.18l-2.26 6.67H8.32L6.06 3.25a.42.42 0 0 0-.14-.18.38.38 0 0 0-.22-.11.39.39 0 0 0-.23.07.42.42 0 0 0-.14.18L2 13.29a.74.74 0 0 0 .27.83L12 21l9.73-6.88a.74.74 0 0 0 .27-.83Z" />
-  </svg>
+  <img src="/gitlab.svg" alt="GitLab" width="40" height="40" />
 );
 
 const LogoBitbucket = () => (
-  <svg
-    width="40"
-    height="40"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M4 3a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H4Z" />
-    <path d="M12 4v16" />
-    <path d="M4 12h16" />
-  </svg>
+  <img
+    src="/bitbucket.webp"
+    alt="Bitbucket"
+    width="48"
+    height="48"
+    style={{ objectFit: "contain" }}
+  />
 );
 
 export default function IntegrationsPage() {
