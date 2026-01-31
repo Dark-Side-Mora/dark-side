@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useLearning } from "../../lib/learning/useLearning";
-import { Shell } from "../../components/ui/Shell";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Input";
 
@@ -89,13 +88,8 @@ export default function LearningPage() {
     fetchUserProgress: () => Promise<any>;
   } = useLearning();
 
-  useEffect(() => {
-    fetchModules();
-    fetchAndSetUserProgress();
-  }, [fetchModules]);
-
   // Helper to fetch and set user progress
-  const fetchAndSetUserProgress = async () => {
+  const fetchAndSetUserProgress = useCallback(async () => {
     try {
       const progress = await fetchUserProgress();
       setUserProgress(progress);
@@ -116,7 +110,15 @@ export default function LearningPage() {
       setUserProgress(null);
       setProgressPercent(0);
     }
-  };
+  }, [fetchUserProgress]);
+
+  useEffect(() => {
+    fetchModules();
+  }, [fetchModules]);
+
+  useEffect(() => {
+    fetchAndSetUserProgress();
+  }, [fetchAndSetUserProgress]);
 
   useEffect(() => {
     if (modules.length > 0 && activeModuleId === null && modules[0]) {
@@ -232,7 +234,7 @@ export default function LearningPage() {
   };
 
   return (
-    <Shell activePage="Learning Hub">
+    <div style={{ padding: "20px" }}>
       <div className="learning-grid">
         <style jsx>{`
           .learning-grid {
@@ -1048,6 +1050,7 @@ export default function LearningPage() {
           </Card>
         </div>
       </div>
-    </Shell>
+      <p>Learning resources content coming soon...</p>
+    </div>
   );
 }

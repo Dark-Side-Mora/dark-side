@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
 import { Button } from "./Button";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useAuthContext } from "@/lib/auth/auth-context";
@@ -215,14 +217,10 @@ const IconMenu = () => (
   </svg>
 );
 
-export const Shell = ({
-  children,
-  activePage,
-}: {
-  children: React.ReactNode;
-  activePage: string;
-}) => {
+export const Shell = ({ children }: { children: React.ReactNode }) => {
   // Initialize from localStorage if available, default to true (dark mode)
+  const router = useRouter();
+  const pathname = usePathname();
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { signOut } = useAuth();
@@ -234,6 +232,7 @@ export const Shell = ({
     selectOrganization,
     fetchOrganizations,
     loading: orgLoading,
+    initialFetchAttempted: orgFetchAttempted,
   } = useOrganization();
 
   const {
@@ -244,15 +243,49 @@ export const Shell = ({
     setRepositoryUrl,
     fetchProjects,
     loading: proLoading,
+    prefetchProjects,
   } = useProject();
 
-  useEffect(() => {
-    if (currentOrgId === null) fetchOrganizations();
-  }, []);
+  // Determine active page based on pathname
+  const getActivePage = (path: string) => {
+    if (path === "/") return "Dashboard";
+    if (path.startsWith("/projects")) return "Projects";
+    if (path.startsWith("/explorer")) return "Run Explorer";
+    if (path.startsWith("/security")) return "Security";
+    if (path.startsWith("/learning")) return "Learning Hub";
+    if (path.startsWith("/settings")) return "Settings";
+    return "";
+  };
+
+  const activePage = getActivePage(pathname || "");
 
   useEffect(() => {
-    fetchProjects(currentOrgId!);
-  }, [currentOrgId]);
+    if (pathname?.startsWith("/auth")) return;
+    if (!orgFetchAttempted) fetchOrganizations();
+  }, [pathname, orgFetchAttempted, fetchOrganizations]);
+
+  useEffect(() => {
+    if (pathname?.startsWith("/auth")) return;
+    // Only fetch if org ID changes, not on every path change
+    if (currentOrgId) {
+      fetchProjects(currentOrgId);
+    }
+  }, [currentOrgId, fetchProjects]);
+
+  // Background Prefetch for all organizations (Optimization) with debounce
+  useEffect(() => {
+    if (organizations && organizations.length > 0) {
+      const timeoutId = setTimeout(() => {
+        organizations.forEach((org) => {
+          if (org.id !== currentOrgId) {
+            prefetchProjects(org.id);
+          }
+        });
+      }, 2000); // Wait 2 seconds before prefetching to let UI settle
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [organizations, currentOrgId, prefetchProjects]);
 
   useEffect(() => {
     // Check localStorage on mount
@@ -261,6 +294,28 @@ export const Shell = ({
       setIsDarkMode(false);
     }
   }, []);
+
+  // Auto-sync after GitHub App installation
+  useEffect(() => {
+    if (pathname?.startsWith("/auth")) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("status");
+    const sync = params.get("sync");
+
+    if (status === "success" && sync === "true") {
+      console.log("[Shell] GitHub App installation detected, auto-syncing...");
+
+      // Refresh organizations and projects
+      fetchOrganizations();
+      if (currentOrgId) {
+        fetchProjects(currentOrgId);
+      }
+
+      // Clear URL parameters
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [pathname, fetchOrganizations, fetchProjects, currentOrgId]);
 
   useEffect(() => {
     // Apply theme class to body and save to localStorage
@@ -272,6 +327,11 @@ export const Shell = ({
       localStorage.setItem("theme", "light");
     }
   }, [isDarkMode]);
+
+  // Bypass Shell for auth pages
+  if (pathname?.startsWith("/auth")) {
+    return <>{children}</>;
+  }
 
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
@@ -364,11 +424,12 @@ export const Shell = ({
           top: 0,
           zIndex: 50,
           transition: "transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+          overflowY: "auto",
         }}
       >
         <div
           style={{
-            marginBottom: "40px",
+            marginBottom: "32px",
             display: "flex",
             alignItems: "center",
             gap: "12px",
@@ -387,42 +448,206 @@ export const Shell = ({
           </h1>
         </div>
 
-        <nav style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          {menuItems.map((item) => (
-            <a
-              key={item.name}
-              href={item.path}
-              onClick={() => setIsSidebarOpen(false)}
+        {/* Organizations Section */}
+        <div style={{ marginBottom: "32px" }}>
+          <div
+            style={{
+              fontSize: "11px",
+              fontWeight: 700,
+              color: "var(--text-secondary)",
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+              marginBottom: "12px",
+              paddingLeft: "12px",
+            }}
+          >
+            Workspaces
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            {organizations.map((org) => (
+              <div
+                key={org.id}
+                onClick={() => {
+                  selectOrganization(org.id);
+                  if (pathname !== "/projects") {
+                    router.push("/projects");
+                  }
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  padding: "8px 12px",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  backgroundColor:
+                    currentOrgId === org.id
+                      ? "rgba(255, 255, 255, 0.05)"
+                      : "transparent",
+                  color:
+                    currentOrgId === org.id
+                      ? "var(--text-primary)"
+                      : "var(--text-secondary)",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                <div
+                  style={{
+                    width: "20px",
+                    height: "20px",
+                    borderRadius: "4px",
+                    backgroundColor:
+                      currentOrgId === org.id
+                        ? "var(--accent-cyan)"
+                        : "var(--border)",
+                    color:
+                      currentOrgId === org.id
+                        ? "#000"
+                        : "var(--text-secondary)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "10px",
+                    fontWeight: 700,
+                  }}
+                >
+                  {org.name.charAt(0).toUpperCase()}
+                </div>
+                <span
+                  style={{
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {org.name}
+                </span>
+                {currentOrgId === org.id && (
+                  <div
+                    style={{
+                      width: "6px",
+                      height: "6px",
+                      borderRadius: "50%",
+                      backgroundColor: "var(--accent-cyan)",
+                      marginLeft: "auto",
+                    }}
+                  />
+                )}
+              </div>
+            ))}
+            <div
+              onClick={() => router.push("/projects")}
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "12px",
-                padding: "12px 16px",
-                borderRadius: "12px",
+                gap: "10px",
+                padding: "8px 12px",
+                borderRadius: "8px",
                 cursor: "pointer",
-                backgroundColor:
-                  activePage === item.name
-                    ? isDarkMode
-                      ? "rgba(255, 255, 255, 0.05)"
-                      : "rgba(0, 0, 0, 0.05)"
-                    : "transparent",
-                color:
-                  activePage === item.name
-                    ? "var(--accent-cyan)"
-                    : "var(--text-secondary)",
-                transition: "all 0.2s ease",
-                border:
-                  activePage === item.name
-                    ? "1px solid rgba(6, 182, 212, 0.2)"
-                    : "1px solid transparent",
-                textDecoration: "none",
+                color: "var(--text-secondary)",
+                fontSize: "13px",
               }}
             >
-              {item.icon}
-              <span style={{ fontSize: "14px", fontWeight: 600 }}>
-                {item.name}
-              </span>
-            </a>
+              <div
+                style={{
+                  width: "20px",
+                  height: "20px",
+                  borderRadius: "4px",
+                  border: "1px dashed var(--text-secondary)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                +
+              </div>
+              <span>Add Workspace</span>
+            </div>
+          </div>
+        </div>
+
+        <nav style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          {menuItems.map((item) => (
+            <div key={item.name}>
+              <Link
+                href={item.path}
+                onClick={() => setIsSidebarOpen(false)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  padding: "12px 16px",
+                  borderRadius: "12px",
+                  cursor: "pointer",
+                  backgroundColor:
+                    activePage === item.name
+                      ? isDarkMode
+                        ? "rgba(255, 255, 255, 0.05)"
+                        : "rgba(0, 0, 0, 0.05)"
+                      : "transparent",
+                  color:
+                    activePage === item.name
+                      ? "var(--accent-cyan)"
+                      : "var(--text-secondary)",
+                  transition: "all 0.2s ease",
+                  border:
+                    activePage === item.name
+                      ? "1px solid rgba(6, 182, 212, 0.2)"
+                      : "1px solid transparent",
+                  textDecoration: "none",
+                }}
+              >
+                {item.icon}
+                <span style={{ fontSize: "14px", fontWeight: 600 }}>
+                  {item.name}
+                </span>
+              </Link>
+
+              {/* Subtitles for Projects */}
+              {item.name === "Projects" && projects.length > 0 && (
+                <div
+                  style={{
+                    marginLeft: "28px",
+                    marginTop: "4px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "2px",
+                    borderLeft: "1px solid var(--border)",
+                  }}
+                >
+                  {projects.map((proj) => (
+                    <div
+                      key={proj.id}
+                      onClick={() => {
+                        setCurrentProjectId(proj.id);
+                        setRepositoryUrl(proj.repositoryUrl);
+                        router.push("/explorer");
+                        setIsSidebarOpen(false);
+                      }}
+                      style={{
+                        padding: "8px 12px",
+                        fontSize: "13px",
+                        color:
+                          projectId === proj.id
+                            ? "var(--text-primary)"
+                            : "var(--text-secondary)",
+                        cursor: "pointer",
+                        borderLeft: "2px solid transparent",
+                        borderColor:
+                          projectId === proj.id
+                            ? "var(--accent-cyan)"
+                            : "transparent",
+                        marginLeft: "-1px",
+                      }}
+                    >
+                      {proj.name}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
         </nav>
 
@@ -447,20 +672,20 @@ export const Shell = ({
                 fontWeight: "bold",
               }}
             >
-              DD
+              {user?.email?.charAt(0).toUpperCase() || "U"}
             </div>
-            <div>
+            <div style={{ overflow: "hidden" }}>
               <div
                 style={{
                   fontSize: "13px",
                   fontWeight: 600,
                   color: "var(--text-primary)",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
                 }}
               >
-                {user?.user_metadata.first_name || ""}
-                {user?.user_metadata.last_name
-                  ? ` ${user?.user_metadata.last_name}`
-                  : ""}
+                {user?.user_metadata.first_name || user?.email || "User"}
               </div>
               <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
                 Pro License
@@ -514,105 +739,17 @@ export const Shell = ({
               >
                 <IconMenu />
               </button>
-              <span
-                style={{ fontSize: "14px", color: "var(--text-secondary)" }}
-                className="desktop-only"
-              >
-                Organization:
-              </span>
-              {orgLoading ? (
-                <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>
-                  Loading...
-                </span>
-              ) : organizations.length === 0 ? (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => (window.location.href = "/settings")}
-                >
-                  No Organization
-                </Button>
-              ) : (
-                <select
-                  value={currentOrgId || organizations[0]?.id}
-                  onChange={(e) => selectOrganization(e.target.value)}
-                  style={{
-                    fontSize: 14,
-                    fontWeight: 600,
-                    padding: "4px 12px",
-                    borderRadius: 8,
-                    border: "1px solid var(--border)",
-                    background: "var(--bg-sidebar)",
-                    color: "var(--text-primary)",
-                    minWidth: 120,
-                    cursor: "pointer",
-                  }}
-                >
-                  {organizations.map((org) => (
-                    <option key={org.id} value={org.id}>
-                      {org.name} ({org.role})
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-            {/* <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <button
-                className="mobile-only"
-                onClick={() => setIsSidebarOpen(true)}
+              <h2
                 style={{
-                  background: "transparent",
-                  border: "none",
+                  fontSize: "16px",
+                  fontWeight: 700,
                   color: "var(--text-primary)",
-                  cursor: "pointer",
-                  marginRight: "8px",
-                  display: "none",
                 }}
               >
-                <IconMenu />
-              </button>
-              <span
-                style={{ fontSize: "14px", color: "var(--text-secondary)" }}
-                className="desktop-only"
-              >
-                Projects:
-              </span>
-              {proLoading ? (
-                <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>
-                  Loading...
-                </span>
-              ) : projects.length === 0 ? (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => (window.location.href = "/projects")}
-                >
-                  No Projects
-                </Button>
-              ) : (
-                <select
-                  value={projectId || projects[0]?.id}
-                  onChange={(e) => setCurrentProjectId(e.target.value)}
-                  style={{
-                    fontSize: 14,
-                    fontWeight: 600,
-                    padding: "4px 12px",
-                    borderRadius: 8,
-                    border: "1px solid var(--border)",
-                    background: "var(--bg-sidebar)",
-                    color: "var(--text-primary)",
-                    minWidth: 120,
-                    cursor: "pointer",
-                  }}
-                >
-                  {projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div> */}
+                {organizations.find((o) => o.id === currentOrgId)?.name ||
+                  "CI-Insight"}
+              </h2>
+            </div>
           </div>
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
             <button
@@ -646,12 +783,6 @@ export const Shell = ({
               >
                 Docs
               </Button>
-              <Button
-                size="sm"
-                onClick={() => (window.location.href = "/projects")}
-              >
-                Connect Repository
-              </Button>
               <Button size="sm" variant="secondary" onClick={handleLogout}>
                 Logout
               </Button>
@@ -660,6 +791,23 @@ export const Shell = ({
         </header>
         <div style={{ padding: "24px" }}>{children}</div>
       </main>
+
+      <style jsx global>{`
+        @media (max-width: 1024px) {
+          .desktop-only {
+            display: none !important;
+          }
+          .main-content-expanded {
+            margin-left: 0 !important;
+            width: 100% !important;
+          }
+        }
+        @media (min-width: 1025px) {
+          .mobile-only {
+            display: none !important;
+          }
+        }
+      `}</style>
     </div>
   );
 };

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Shell } from "../../components/ui/Shell";
+import { useRouter } from "next/navigation";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Input";
 
@@ -73,13 +73,13 @@ const PipelinesPage = () => {
   };
 
   return (
-    <Shell activePage="Pipelines">
+    <>
       <div
         style={{
+          marginBottom: "24px",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: "32px",
         }}
       >
         <div>
@@ -298,7 +298,7 @@ const PipelinesPage = () => {
           </Card>
         ))}
       </div>
-    </Shell>
+    </>
   );
 };
 

@@ -139,8 +139,11 @@ export async function fetchWithAuth(
 /**
  * Helper for GET requests
  */
-export async function apiGet<T>(url: string): Promise<T> {
-  const response = await fetchWithAuth(url, { method: "GET" });
+export async function apiGet<T>(
+  url: string,
+  options: RequestOptions = {},
+): Promise<T> {
+  const response = await fetchWithAuth(url, { ...options, method: "GET" });
 
   if (response.status === 401) {
     throw new Error("Unauthorized - please login again");

@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Shell } from "../../components/ui/Shell";
 import { Button } from "../../components/ui/Button";
 import { Card, Input } from "../../components/ui/Input";
 import { useAuthContext } from "../../lib/auth/auth-context";
@@ -760,64 +759,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
               )}
-              <div style={{ marginTop: "32px" }}>
-                <Button
-                  style={{ width: "fit-content" }}
-                  onClick={() => setShowCreateOrg((v) => !v)}
-                >
-                  {showCreateOrg ? "Cancel" : "Create Organization"}
-                </Button>
-              </div>
-              {showCreateOrg && (
-                <div
-                  style={{
-                    marginTop: 24,
-                    background: "var(--card-bg)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 8,
-                    padding: 24,
-                    maxWidth: 400,
-                  }}
-                >
-                  <h3 style={{ marginBottom: 16 }}>Create Organization</h3>
-                  <Input
-                    label="Name"
-                    value={newOrgName}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setNewOrgName(e.target.value)
-                    }
-                  />
-                  <Input
-                    label="Domain"
-                    value={newOrgDomain}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setNewOrgDomain(e.target.value)
-                    }
-                  />
-                  <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
-                    <Button
-                      onClick={async () => {
-                        try {
-                          await createOrganization(newOrgName, newOrgDomain);
-                          setShowCreateOrg(false);
-                          setNewOrgName("");
-                          setNewOrgDomain("");
-                          await fetchOrganizations();
-                        } catch {}
-                      }}
-                      disabled={!newOrgName || !newOrgDomain}
-                    >
-                      Create
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={() => setShowCreateOrg(false)}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              )}
+              {/* Manual creation is now disabled in favor of GitHub App auto-onboarding */}
             </div>
           </Card>
         );
@@ -1097,36 +1039,30 @@ export default function SettingsPage() {
   };
 
   return (
-    <Shell activePage="Settings">
-      <div style={{ maxWidth: "800px" }}>
-        <h2 style={{ fontSize: "28px", fontWeight: 800, marginBottom: "4px" }}>
-          Settings
-        </h2>
-        <p
-          style={{
-            color: "var(--text-secondary)",
-            fontSize: "14px",
-            marginBottom: "32px",
-          }}
-        >
-          Manage your account settings and platform integrations.
-        </p>
+    <div style={{ maxWidth: "800px", margin: "0 auto" }}>
+      <h2 style={{ fontSize: "28px", fontWeight: 800, marginBottom: "4px" }}>
+        Settings
+      </h2>
+      <p
+        style={{
+          color: "var(--text-secondary)",
+          fontSize: "14px",
+          marginBottom: "32px",
+        }}
+      >
+        Manage your account settings and platform integrations.
+      </p>
 
-        <div
-          style={{
-            display: "flex",
-            gap: "32px",
-            borderBottom: "1px solid var(--border)",
-            marginBottom: "32px",
-          }}
-        >
-          {[
-            "Profile",
-            "Organization",
-            "Security",
-            "Billing",
-            "Integrations",
-          ].map((t) => (
+      <div
+        style={{
+          display: "flex",
+          gap: "32px",
+          borderBottom: "1px solid var(--border)",
+          marginBottom: "32px",
+        }}
+      >
+        {["Profile", "Organization", "Security", "Billing", "Integrations"].map(
+          (t) => (
             <div
               key={t}
               onClick={() => setTab(t)}
@@ -1146,42 +1082,38 @@ export default function SettingsPage() {
             >
               {t}
             </div>
-          ))}
-        </div>
-
-        {renderContent()}
+          ),
+        )}
       </div>
-    </Shell>
+
+      {renderContent()}
+    </div>
   );
 
   // Show auth prompt if not authenticated
   if (!authLoading && !isAuthenticated) {
     return (
-      <Shell activePage="Settings">
-        <div style={{ maxWidth: "800px" }}>
-          <h2
-            style={{ fontSize: "28px", fontWeight: 800, marginBottom: "4px" }}
-          >
-            Settings
-          </h2>
-          <Card style={{ marginTop: "32px" }}>
-            <div style={{ textAlign: "center", padding: "32px" }}>
-              <p
-                style={{
-                  fontSize: "16px",
-                  color: "var(--text-secondary)",
-                  marginBottom: "16px",
-                }}
-              >
-                Please log in to access your settings.
-              </p>
-              <Button onClick={() => (window.location.href = "/auth/login")}>
-                Go to Login
-              </Button>
-            </div>
-          </Card>
-        </div>
-      </Shell>
+      <div style={{ maxWidth: "800px", margin: "0 auto" }}>
+        <h2 style={{ fontSize: "28px", fontWeight: 800, marginBottom: "4px" }}>
+          Settings
+        </h2>
+        <Card style={{ marginTop: "32px" }}>
+          <div style={{ textAlign: "center", padding: "32px" }}>
+            <p
+              style={{
+                fontSize: "16px",
+                color: "var(--text-secondary)",
+                marginBottom: "16px",
+              }}
+            >
+              Please log in to access your settings.
+            </p>
+            <Button onClick={() => (window.location.href = "/auth/login")}>
+              Go to Login
+            </Button>
+          </div>
+        </Card>
+      </div>
     );
   }
 }
