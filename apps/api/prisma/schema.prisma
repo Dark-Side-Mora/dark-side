@@ -38,6 +38,7 @@ model User {
 
   organizationMemberships OrganizationMembership[]
   membershipRequests MembershipRequest[]
+  githubInstallations GitHubInstallationUser[]
 }
 
 model Project {
@@ -57,7 +58,7 @@ model Project {
 model Pipeline {
   id               String            @id @default(uuid())
   projectId        String
-  project          Project           @relation(fields: [projectId], references: [id])
+  project          Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   externalId       String            // CI Provider's ID
   status           String
   branch           String?
@@ -65,6 +66,7 @@ model Pipeline {
   eventType        String?           // push, pull_request
   startedAt        DateTime?
   finishedAt       DateTime?
+  workflowContent  String?           @db.Text
   createdAt        DateTime          @default(now())
   jobs             Job[]
   securityFindings SecurityFinding[]
@@ -73,7 +75,7 @@ model Pipeline {
 model Job {
   id         String    @id @default(uuid())
   pipelineId String
-  pipeline   Pipeline  @relation(fields: [pipelineId], references: [id])
+  pipeline   Pipeline  @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   name       String
   status     String
   stage      String?
@@ -84,7 +86,7 @@ model Job {
 model SecurityFinding {
   id          String   @id @default(uuid())
   pipelineId  String
-  pipeline    Pipeline @relation(fields: [pipelineId], references: [id])
+  pipeline    Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   severity    String   
   type        String
   description String?
@@ -127,7 +129,6 @@ model OrganizationAccess {
 
 model GitHubInstallation {
   id                  String                @id @default(uuid())
-  userId              String                // Supabase Auth User ID
   connectionId        String?
   connection          IntegrationConnection? @relation(fields: [connectionId], references: [id], onDelete: Cascade)
   installationId      String                @unique // GitHub App installation ID
@@ -141,10 +142,23 @@ model GitHubInstallation {
   status              String                @default("active") // active, suspended, removed
   installedAt         DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
+  
+  users               GitHubInstallationUser[]
 
-  @@index([userId])
   @@index([installationId])
   @@index([accountId])
+}
+
+model GitHubInstallationUser {
+  id               String            @id @default(uuid())
+  installationId   String
+  installation     GitHubInstallation @relation(fields: [installationId], references: [id], onDelete: Cascade)
+  userId           String            // Supabase Auth User ID
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  addedAt          DateTime          @default(now())
+
+  @@unique([installationId, userId])
+  @@index([userId])
 }
 
 model GitHubRepository {
@@ -242,6 +256,7 @@ model UserQuizProgress {
 model Organization {
   id        String   @id @default(uuid())
   name      String
+  provider  String   @default("github") // 'github', 'jenkins', etc.
   domain    String
   members   OrganizationMembership[]
   requests  MembershipRequest[]

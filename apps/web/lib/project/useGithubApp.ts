@@ -27,10 +27,23 @@ export const useGithubApp = () => {
   //     return apiPost(`${API_URL}/integrations/github-app/installations/${installationId}/sync`, {});
   // };
 
+  // Get GitHub App installation URL
+  const installGithubApp = async (redirectUri: string) => {
+    return apiPost(`${API_URL}/integrations/github-app/install`, {
+      redirectUri,
+    });
+  };
+
+  // Sync installations from GitHub
+  const syncInstallations = async () => {
+    return apiPost(`${API_URL}/integrations/github-app/sync`, {});
+  };
+
   return {
     authorizeGithubApp,
     checkGithubAppAuthorized,
     fetchInstallations,
-    // syncInstallation,
+    installGithubApp,
+    syncInstallations,
   };
 };

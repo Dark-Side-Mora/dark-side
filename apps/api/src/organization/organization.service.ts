@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { CreateOrganizationDto } from './dto/organization.dto';
 
 @Injectable()
 export class OrganizationService {
@@ -93,10 +94,12 @@ export class OrganizationService {
       name: m.organization.name,
       domain: m.organization.domain,
       role: m.role,
+      provider: (m.organization as any).provider,
     }));
   }
 
-  async createOrganization(ownerId: string, name: string, domain: string) {
+  async createOrganization(ownerId: string, dto: CreateOrganizationDto) {
+    const { name, domain, provider = 'github' } = dto;
     if (!name || !domain) {
       throw new ForbiddenException('Organization name and domain are required');
     }
@@ -110,10 +113,11 @@ export class OrganizationService {
       );
     }
     // Create organization and add owner as member
-    return this.prisma.organization.create({
+    return (this.prisma.organization as any).create({
       data: {
         name,
         domain,
+        provider,
         members: {
           create: {
             userId: ownerId,

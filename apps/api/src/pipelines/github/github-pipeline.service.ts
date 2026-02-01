@@ -50,32 +50,28 @@ export class GithubPipelineService implements IPipelineProvider {
         recentRuns: [],
       }));
 
-      const workflowsWithRuns: Workflow[] = [];
-
       let totalRuns = 0;
       let latestRunStatus: string | undefined;
       let latestRunDate: Date | null = null;
 
-      // For each workflow, fetch recent runs and their jobs
-      for (const workflow of workflows) {
-        // Fetch workflow file content
-        workflow.content = await this.fetchWorkflowFileContent(
-          octokit,
-          owner,
-          repo,
-          workflow.path,
-        );
+      // For each workflow, fetch recent runs and their jobs (PARALLELIZED)
+      const workflowPromises = workflows.map(async (workflow) => {
+        // Fetch workflow file content and runs in parallel
+        const [content, runs] = await Promise.all([
+          this.fetchWorkflowFileContent(octokit, owner, repo, workflow.path),
+          this.fetchWorkflowRunsDetailed(
+            octokit,
+            owner,
+            repo,
+            workflow.id as number,
+            10,
+          ),
+        ]);
 
-        const runs = await this.fetchWorkflowRunsDetailed(
-          octokit,
-          owner,
-          repo,
-          workflow.id as number,
-          10,
-        );
-        const runsWithJobs: WorkflowRun[] = [];
+        workflow.content = content;
 
-        for (const run of runs) {
+        // Fetch jobs for all runs in parallel
+        const runsWithJobsPromises = runs.map(async (run) => {
           const jobs = await this.fetchRunJobs(
             octokit,
             owner,
@@ -83,23 +79,30 @@ export class GithubPipelineService implements IPipelineProvider {
             run.id as number,
           );
 
-          for (const job of jobs) {
-            job.logs = await this.fetchJobLogs(
-              octokit,
-              owner,
-              repo,
-              job.id as number,
-            );
-          }
+          // Fetch logs for all jobs in parallel
+          const jobsWithLogs = await Promise.all(
+            jobs.map(async (job) => ({
+              ...job,
+              logs: await this.fetchJobLogs(
+                octokit,
+                owner,
+                repo,
+                job.id as number,
+              ),
+            })),
+          );
 
-          runsWithJobs.push({
+          return {
             ...run,
-            jobs,
-          });
+            jobs: jobsWithLogs,
+          };
+        });
 
+        const runsWithJobs = await Promise.all(runsWithJobsPromises);
+
+        // Track latest run and total runs
+        for (const run of runsWithJobs) {
           totalRuns++;
-
-          // Track latest run
           const runDate = new Date(run.triggeredAt);
           if (!latestRunDate || runDate > latestRunDate) {
             latestRunDate = runDate;
@@ -107,11 +110,13 @@ export class GithubPipelineService implements IPipelineProvider {
           }
         }
 
-        workflowsWithRuns.push({
+        return {
           ...workflow,
           recentRuns: runsWithJobs,
-        });
-      }
+        };
+      });
+
+      const workflowsWithRuns = await Promise.all(workflowPromises);
 
       return {
         repository: {
@@ -348,7 +353,14 @@ export class GithubPipelineService implements IPipelineProvider {
 
       return '';
     } catch (error) {
-      console.error(`Error fetching workflow file ${workflowPath}:`, error);
+      console.error(
+        `[GithubPipelineService] Error fetching workflow file ${workflowPath}:`,
+        {
+          message: error.message,
+          status: error.status,
+          response: error.response?.data,
+        },
+      );
       return '';
     }
   }

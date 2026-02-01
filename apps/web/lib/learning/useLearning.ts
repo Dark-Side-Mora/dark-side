@@ -1,5 +1,8 @@
-import { useState, useCallback } from "react";
+"use client";
+import { useState, useCallback, useMemo } from "react";
 import { apiGet, apiPost, apiDelete } from "../api/client";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 export function useLearning() {
   const [modules, setModules] = useState([]);
@@ -7,13 +10,14 @@ export function useLearning() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [userProgress, setUserProgress] = useState(null);
-
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+  const [fetchAttempted, setFetchAttempted] = useState(false);
 
   // Fetch modules with quizzes
   const fetchModules = useCallback(async () => {
+    if (fetchAttempted) return;
     setLoading(true);
     setError(null);
+    setFetchAttempted(true);
     try {
       const url = `${API_URL}/learning/modules`;
       const result = await apiGet<any>(url);
@@ -25,27 +29,24 @@ export function useLearning() {
     } finally {
       setLoading(false);
     }
-  }, [API_URL]);
+  }, [fetchAttempted]);
 
   // Fetch quiz details by quizId
-  const fetchQuizById = useCallback(
-    async (quizId: number) => {
-      setLoading(true);
-      setError(null);
-      try {
-        const url = `${API_URL}/learning/quiz/${quizId}`;
-        const result = await apiGet<any>(url);
-        setSelectedQuiz(result.data || result);
-        return result.data || result;
-      } catch (err: any) {
-        setError(err.message);
-        return null;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [API_URL],
-  );
+  const fetchQuizById = useCallback(async (quizId: number) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const url = `${API_URL}/learning/quiz/${quizId}`;
+      const result = await apiGet<any>(url);
+      setSelectedQuiz(result.data || result);
+      return result.data || result;
+    } catch (err: any) {
+      setError(err.message);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   // Update user progress (submit answer)
   const updateUserProgress = useCallback(
@@ -63,7 +64,7 @@ export function useLearning() {
         setLoading(false);
       }
     },
-    [API_URL],
+    [],
   );
 
   // Get user progress summary
@@ -81,7 +82,7 @@ export function useLearning() {
     } finally {
       setLoading(false);
     }
-  }, [API_URL]);
+  }, []);
 
   // Reset user progress (re-attempt)
   const resetUserProgress = useCallback(async () => {
@@ -98,20 +99,36 @@ export function useLearning() {
     } finally {
       setLoading(false);
     }
-  }, [API_URL]);
+  }, []);
 
-  return {
-    modules,
-    selectedQuiz,
-    loading,
-    error,
-    userProgress,
-    fetchModules,
-    fetchQuizById,
-    updateUserProgress,
-    fetchUserProgress,
-    resetUserProgress,
-    setModules,
-    setSelectedQuiz,
-  };
+  return useMemo(
+    () => ({
+      modules,
+      selectedQuiz,
+      loading,
+      error,
+      userProgress,
+      fetchModules,
+      fetchQuizById,
+      updateUserProgress,
+      fetchUserProgress,
+      resetUserProgress,
+      setModules,
+      setSelectedQuiz,
+    }),
+    [
+      modules,
+      selectedQuiz,
+      loading,
+      error,
+      userProgress,
+      fetchModules,
+      fetchQuizById,
+      updateUserProgress,
+      fetchUserProgress,
+      resetUserProgress,
+      setModules,
+      setSelectedQuiz,
+    ],
+  );
 }

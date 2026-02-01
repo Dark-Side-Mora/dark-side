@@ -6,6 +6,7 @@ import {
   Query,
   Param,
   BadRequestException,
+  InternalServerErrorException,
   HttpStatus,
   Res,
   Headers,
@@ -15,10 +16,15 @@ import {
 import type { Response } from 'express';
 import { GithubAppService } from './github-app.service';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { ConfigService } from '@nestjs/config';
+import * as crypto from 'crypto';
 
 @Controller('integrations/github-app')
 export class GithubAppController {
-  constructor(private readonly githubAppService: GithubAppService) {}
+  constructor(
+    private readonly githubAppService: GithubAppService,
+    private readonly configService: ConfigService,
+  ) {}
 
   /**
    * POST /integrations/github-app/authorize
@@ -72,54 +78,81 @@ export class GithubAppController {
   /**
    * GET /integrations/github-app/callback
    * Handle GitHub App installation callback
+   * Supports both OAuth flow (code) and direct installation flow (installation_id)
    */
   @Get('callback')
   async callback(
-    @Query('code') code: string,
-    @Query('installation_id') installationId: string,
-    @Query('setup_action') setupAction: string,
-    @Query('state') state: string,
+    @Query('code') code?: string,
+    @Query('installation_id') installationId?: string,
+    @Query('setup_action') setupAction?: string,
+    @Query('state') state?: string,
+    // @ts-ignore - NestJS decorators handle parameters differently than TypeScript expects
     @Res() res: Response,
   ) {
-    if (!code || !state) {
-      throw new BadRequestException('Missing code or state parameter');
+    // Decode state to get userId and redirectUri
+    let decodedState: { userId?: string; redirectUri?: string } = {
+      redirectUri: process.env.FRONTEND_URL || 'http://localhost:3001/projects',
+    };
+
+    if (state) {
+      try {
+        decodedState = JSON.parse(
+          Buffer.from(state, 'base64').toString('utf8'),
+        );
+      } catch (e) {
+        console.error('[GithubAppController] Failed to decode state:', e);
+      }
     }
 
-    try {
-      const result = await this.githubAppService.handleInstallationCallback(
-        code,
-        state,
-      );
+    const redirectUri =
+      decodedState.redirectUri || 'http://localhost:3001/projects';
 
-      // Redirect to frontend with success
-      if (result.redirectUri) {
+    try {
+      // Handle direct installation flow (installation_id + setup_action)
+      if (installationId && setupAction) {
+        console.log(
+          `[GithubAppController] Direct installation flow: installationId=${installationId}, setupAction=${setupAction}`,
+        );
+
+        // Sync the installation immediately
+        if (decodedState.userId) {
+          await this.githubAppService.syncInstallationById(
+            installationId,
+            decodedState.userId,
+          );
+        }
+
+        return res.redirect(
+          `${redirectUri}?status=success&sync=true&installation_id=${installationId}`,
+        );
+      }
+
+      // Handle OAuth flow (code + state)
+      if (code && state) {
+        console.log('[GithubAppController] OAuth flow: code received');
+
+        const result = await this.githubAppService.handleInstallationCallback(
+          code,
+          state,
+        );
+
         return res.redirect(
           `${result.redirectUri}?status=success&installations=${result.installations.length}`,
         );
       }
 
-      return res.json({
-        statusCode: HttpStatus.OK,
-        message: 'GitHub App installed successfully',
-        data: {
-          installations: result.installations.length,
-        },
-      });
+      // Missing required parameters
+      console.warn(
+        '[GithubAppController] Missing required callback parameters',
+      );
+      return res.redirect(
+        `${redirectUri}?status=error&message=Invalid callback parameters`,
+      );
     } catch (error) {
-      if (state) {
-        try {
-          const decodedState = JSON.parse(
-            Buffer.from(state, 'base64').toString('utf8'),
-          );
-          if (decodedState.redirectUri) {
-            return res.redirect(
-              `${decodedState.redirectUri}?status=error&message=${error.message}`,
-            );
-          }
-        } catch {}
-      }
-
-      throw error;
+      console.error('[GithubAppController] Callback error:', error);
+      return res.redirect(
+        `${redirectUri}?status=error&message=${encodeURIComponent(error.message)}`,
+      );
     }
   }
 
@@ -164,25 +197,50 @@ export class GithubAppController {
   }
 
   /**
-   * POST /integrations/github-app/installations/:installationId/sync
-   * Sync installation repositories from GitHub
+   * POST /integrations/github-app/sync
+   * Sync all installations from GitHub
    */
-  // @UseGuards(JwtAuthGuard)
-  // @Post('installations/:installationId/sync')
-  // async syncInstallation(@Param('installationId') installationId: string) {
-  //   if (!installationId) {
-  //     throw new BadRequestException('installationId is required');
-  //   }
+  @UseGuards(JwtAuthGuard)
+  @Post('sync')
+  async syncAllInstallations(@Req() req) {
+    try {
+      // Re-fetch all installations from GitHub
+      await this.githubAppService.getUserInstallations(req.user.id, true);
 
-  //   const result =
-  //     await this.githubAppService.syncInstallationRepositories(installationId);
+      return {
+        statusCode: HttpStatus.OK,
+        message: 'Installations synced successfully',
+      };
+    } catch (error) {
+      throw new InternalServerErrorException(
+        `Failed to sync installations: ${error.message}`,
+      );
+    }
+  }
 
-  //   return {
-  //     statusCode: HttpStatus.OK,
-  //     message: 'Installation synced successfully',
-  //     data: result,
-  //   };
-  // }
+  /**
+   * POST /integrations/github-app/installations/:installationId/sync
+   * Sync specific installation repositories from GitHub
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('installations/:installationId/sync')
+  async syncInstallation(
+    @Req() req,
+    @Param('installationId') installationId: string,
+  ) {
+    if (!installationId) {
+      throw new BadRequestException('installationId is required');
+    }
+
+    const result =
+      await this.githubAppService.syncInstallationRepositories(installationId);
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Installation synced successfully',
+      data: result,
+    };
+  }
 
   /**
    * POST /integrations/github-app/webhook
@@ -194,7 +252,18 @@ export class GithubAppController {
     @Headers('x-hub-signature-256') signature: string,
     @Body() payload: any,
   ) {
-    // TODO: Verify webhook signature
+    // Verify webhook signature
+    const secret = this.configService.get<string>('GITHUB_WEBHOOK_SECRET');
+    if (secret) {
+      const hmac = crypto.createHmac('sha256', secret);
+      const digest =
+        'sha256=' + hmac.update(JSON.stringify(payload)).digest('hex');
+
+      if (digest !== signature) {
+        console.warn('[GithubAppController] Invalid webhook signature');
+        throw new BadRequestException('Invalid signature');
+      }
+    }
 
     await this.githubAppService.handleWebhookEvent(event, payload);
 

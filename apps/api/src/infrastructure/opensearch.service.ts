@@ -21,15 +21,16 @@ export class OpenSearchService {
     });
   }
 
-  async searchLogs(projectId: string, query: string) {
+  async searchLogs(projectId: string, jobId: string) {
     return await this.client.search({
       index: `pipeline-logs-${projectId}`,
       body: {
         query: {
-          match: {
-            message: query,
+          bool: {
+            must: [{ match: { jobId: jobId } }],
           },
         },
+        size: 1,
       },
     });
   }

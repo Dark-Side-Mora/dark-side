@@ -2,9 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { PrismaService } from './prisma/prisma.service';
-import { RedisService } from './infrastructure/redis.service';
-import { OpenSearchService } from './infrastructure/opensearch.service';
+import { InfrastructureModule } from './infrastructure/infrastructure.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { PipelinesModule } from './pipelines/pipelines.module';
 import { LearningModule } from './learning/learning.module';
@@ -22,8 +20,9 @@ import { OrganizationModule } from './organization/organization.module';
     PipelinesModule,
     LearningModule,
     OrganizationModule,
+    InfrastructureModule,
   ],
   controllers: [AppController],
-  providers: [AppService, PrismaService, RedisService, OpenSearchService],
+  providers: [AppService],
 })
 export class AppModule {}

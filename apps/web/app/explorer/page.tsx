@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
-import { Shell } from "../../components/ui/Shell";
 import { Card } from "../../components/ui/Input";
 import { Button } from "../../components/ui/Button";
-import { useGithubPipeline } from "@/lib/project/useGithubPipeline";
-import type { WorkflowRun } from "@/lib/project/useGithubPipeline";
+import { usePipeline } from "@/lib/project/usePipeline";
+import { useProjectContext } from "@/lib/project/ProjectContext";
+import { useOrganizationContext } from "@/lib/organization/OrganizationContext";
+import type { WorkflowRun } from "@/lib/project/usePipeline";
 
 // --- Professional Node Component with Fixed Dimensions for Alignment ---
 const NODE_WIDTH = 240;
@@ -201,17 +202,15 @@ function parseJobsFromYaml(yaml: string) {
 
 export default function RunExplorerPage() {
   // --- State for API Data ---
-  const [userId] = useState("test-user-123");
   const {
-    repos,
-    selectedRepo,
-    setSelectedRepo,
-    pipelineData,
-    loading,
-    message,
-    fetchRepos,
-    fetchPipeline,
-  } = useGithubPipeline(userId);
+    repositoryUrl,
+    setRepositoryUrl,
+    setCurrentProjectId,
+    projects,
+    projectCache,
+  } = useProjectContext();
+  const { setCurrentOrgId } = useOrganizationContext();
+  const { pipelineData, loading, error, fetchPipeline } = usePipeline();
   const [view, setView] = useState("visualization");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownMenuRef = useRef<HTMLDivElement>(null);
@@ -222,23 +221,40 @@ export default function RunExplorerPage() {
   // Track previous repo to trigger loading
   const prevRepoRef = useRef<string | null>(null);
 
-  // When selectedRepo changes, show loading until data is fetched
+  // When repositoryUrl changes, show loading until data is fetched
   React.useEffect(() => {
-    if (selectedRepo && prevRepoRef.current !== selectedRepo) {
+    if (repositoryUrl && prevRepoRef.current !== repositoryUrl) {
       setIsLoading(true);
-      // Simulate loading until pipelineData is updated (or loading is false)
-      // If fetchPipeline is async, you may want to await it or listen to loading
-      // Here, we watch loading and pipelineData
     }
-    prevRepoRef.current = selectedRepo;
-  }, [selectedRepo]);
+    prevRepoRef.current = repositoryUrl;
+  }, [repositoryUrl]);
 
-  // When loading is done and pipelineData is present, stop loading
+  // Sync with ProjectContext
+  useEffect(() => {
+    if (repositoryUrl) {
+      // Find the project matching this repo URL to get its provider
+      const project = projects.find((p) => p.repositoryUrl === repositoryUrl);
+      if (project) {
+        fetchPipeline(repositoryUrl, project.provider);
+      }
+    }
+  }, [repositoryUrl, projects, fetchPipeline]);
+
+  // Update context when dropdown changes
+  const handleRepoChange = (project: any) => {
+    setSelectedRunId(null);
+    setRepositoryUrl(project.repositoryUrl);
+    setCurrentProjectId(project.id);
+    setCurrentOrgId(project.organizationId);
+    fetchPipeline(project.repositoryUrl, project.provider);
+  };
+
+  // When loading is done, stop local loading
   React.useEffect(() => {
-    if (!loading && pipelineData && isLoading) {
+    if (!loading && isLoading) {
       setIsLoading(false);
     }
-  }, [loading, pipelineData, isLoading]);
+  }, [loading, isLoading]);
 
   // Dropdown close logic
   React.useEffect(() => {
@@ -294,6 +310,7 @@ export default function RunExplorerPage() {
     ? pipelineData.workflows.flatMap((w) =>
         w.recentRuns.map((r) => ({
           id: r.id,
+          workflowId: w.id,
           label: `Run #${r.runNumber}`,
           status: getStatus(r),
           branch: r.branch,
@@ -370,10 +387,8 @@ export default function RunExplorerPage() {
     meta: "",
     id: job.name,
   }));
-  // Filter: only show pending or running jobs
-  const vizNodes = allVizNodes.filter(
-    (n) => n.status === "pending" || n.status === "running",
-  );
+  // Show all jobs in the graph (not just pending/running)
+  const vizNodes = allVizNodes;
   const jobNameToIdx = Object.fromEntries(vizNodes.map((n, i) => [n.name, i]));
   const jobEdges = jobGraph.edges
     .map((edge) => ({
@@ -384,33 +399,28 @@ export default function RunExplorerPage() {
       (edge) => typeof edge.from === "number" && typeof edge.to === "number",
     );
 
-  // If no repos, show message
-  if (repos.length === 0) {
+  // If no projects, show message
+  if (projects.length === 0) {
     return (
-      <Shell activePage="Run Explorer">
-        <div
-          style={{
-            padding: "40px",
-            textAlign: "center",
-            color: "var(--text-secondary)",
-          }}
-        >
-          <h2
-            style={{ fontSize: "18px", fontWeight: 700, marginBottom: "16px" }}
-          >
-            No Repositories Found
-          </h2>
-          <p style={{ fontSize: "14px" }}>
-            Please install the GitHub App and add repositories to explore CI/CD
-            runs.
-          </p>
-        </div>
-      </Shell>
+      <div
+        style={{
+          padding: "40px",
+          textAlign: "center",
+          color: "var(--text-secondary)",
+        }}
+      >
+        <h2 style={{ fontSize: "18px", fontWeight: 700, marginBottom: "16px" }}>
+          No Projects Found
+        </h2>
+        <p style={{ fontSize: "14px" }}>
+          Please add some projects to explore CI/CD runs.
+        </p>
+      </div>
     );
   }
 
   return (
-    <Shell activePage="Run Explorer">
+    <>
       <div className="explorer-container">
         {/* Left Sidebar (Repo & Run Selection) */}
         <div
@@ -456,7 +466,7 @@ export default function RunExplorerPage() {
                 alignItems: "center",
               }}
             >
-              <span>{selectedRepo || "Select a repository"}</span>
+              <span>{repositoryUrl || "Select a repository"}</span>
               <svg width="10" height="6" viewBox="0 0 10 6" fill="none">
                 <path
                   d="M1 1L5 5L9 1"
@@ -485,41 +495,39 @@ export default function RunExplorerPage() {
                 color: "var(--text-primary)",
               }}
             >
-              {repos.map((r) => (
+              {projects.map((p, idx) => (
                 <div
-                  key={r.id}
+                  key={`${p.id}-${idx}`}
                   onClick={() => {
-                    setSelectedRepo(r.fullName);
+                    handleRepoChange(p);
                     setDropdownOpen(false);
                   }}
                   style={{
                     padding: "12px 16px",
                     fontSize: "14px",
                     color:
-                      r.fullName === selectedRepo
+                      p.repositoryUrl === repositoryUrl
                         ? "var(--accent-cyan)"
                         : "var(--text-primary)",
                     cursor: "pointer",
                     backgroundColor:
-                      r.fullName === selectedRepo
+                      p.repositoryUrl === repositoryUrl
                         ? "rgba(6, 182, 212, 0.05)"
                         : "transparent",
                     transition: "all 0.2s ease",
-                    borderBottomWidth: 1,
-                    borderBottomStyle: "solid",
-                    borderBottomColor: "var(--border)",
+                    borderBottom: "1px solid var(--border)",
                   }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.backgroundColor = "var(--glass-bg)")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.backgroundColor =
-                      r.fullName === selectedRepo
-                        ? "rgba(6, 182, 212, 0.05)"
-                        : "transparent")
-                  }
                 >
-                  {r.fullName}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
+                    <span>{p.provider === "github" ? "🐙" : "📦"}</span>
+                    <span>{p.repositoryUrl}</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -564,7 +572,7 @@ export default function RunExplorerPage() {
               </div>
             ) : (
               <>
-                {runHistory.length === 0 && (
+                {runHistory.length === 0 && !isLoading && !loading && (
                   <div
                     style={{ color: "var(--text-secondary)", fontSize: "13px" }}
                   >
@@ -573,17 +581,15 @@ export default function RunExplorerPage() {
                 )}
                 {runHistory.map((run) => (
                   <div
-                    key={run.id}
-                    onClick={() => setSelectedRunId(run.id)}
+                    key={`${run.workflowId}-${run.id}`}
+                    onClick={() => setSelectedRunId(run.id as any)}
                     style={{
                       padding: "16px",
                       borderRadius: "12px",
-                      borderWidth: 1,
-                      borderStyle: "solid",
-                      borderColor:
+                      border:
                         run.id === selectedRunId
-                          ? "var(--accent-cyan)"
-                          : "var(--border)",
+                          ? "1px solid var(--accent-cyan)"
+                          : "1px solid var(--border)",
                       cursor: "pointer",
                       backgroundColor:
                         run.id === selectedRunId
@@ -654,6 +660,11 @@ export default function RunExplorerPage() {
               zIndex: 20,
             }}
           >
+            {error && (
+              <div style={{ color: "var(--error)", fontSize: "12px" }}>
+                {error}
+              </div>
+            )}
             <div>
               <h2 style={{ fontSize: "18px", fontWeight: 800 }}>
                 {selectedRunId
@@ -661,7 +672,7 @@ export default function RunExplorerPage() {
                   : "Visualization"}
               </h2>
               <p style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-                {selectedRepo}{" "}
+                {repositoryUrl}{" "}
                 {selectedRunId && (
                   <>
                     / {runHistory.find((r) => r.id === selectedRunId)?.workflow}
@@ -732,6 +743,40 @@ export default function RunExplorerPage() {
                 />
                 Loading pipeline data...
               </div>
+            ) : error ? (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: "100%",
+                  color: "var(--error)",
+                  fontSize: 16,
+                  padding: "40px",
+                  textAlign: "center",
+                }}
+              >
+                <div style={{ marginBottom: "16px", fontSize: "40px" }}>⚠️</div>
+                <div style={{ fontWeight: 700, marginBottom: "8px" }}>
+                  Failed to Load Pipeline
+                </div>
+                <div style={{ color: "var(--text-secondary)" }}>{error}</div>
+                {error.includes("Resource not accessible") && (
+                  <div
+                    style={{
+                      marginTop: "16px",
+                      fontSize: "13px",
+                      color: "var(--text-secondary)",
+                    }}
+                  >
+                    This usually means the GitHub App lacks{" "}
+                    <b>Actions: Read-only</b> permissions.
+                    <br />
+                    Please update the app permissions in GitHub Settings.
+                  </div>
+                )}
+              </div>
             ) : view === "visualization" ? (
               <div className="pipeline-graph">
                 {/* Job connectivity graph from YAML */}
@@ -792,7 +837,7 @@ export default function RunExplorerPage() {
                   vizNodes.map((node, idx) => (
                     <PipelineNode key={node.id || idx} {...node} />
                   ))
-                ) : (
+                ) : !isLoading && !loading ? (
                   <div
                     style={{
                       color: "var(--text-secondary)",
@@ -802,7 +847,7 @@ export default function RunExplorerPage() {
                   >
                     No jobs to visualize for this workflow.
                   </div>
-                )}
+                ) : null}
               </div>
             ) : view === "logs" ? (
               <div
@@ -853,7 +898,11 @@ export default function RunExplorerPage() {
                     const run = pipelineData?.workflows
                       .flatMap((w) => w.recentRuns)
                       .find((r) => r.id === selectedRunId);
-                    if (!run) return <div>No run details found.</div>;
+
+                    if (!run) {
+                      if (isLoading || loading) return null;
+                      return <div>No run details found.</div>;
+                    }
                     return (
                       <>
                         <div
@@ -993,7 +1042,42 @@ export default function RunExplorerPage() {
               >
                 {/* Show workflow YAML content */}
                 {(() => {
-                  if (!pipelineData || !pipelineData.workflows)
+                  if (isLoading || loading) {
+                    return (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          height: "100%",
+                          color: "var(--text-secondary)",
+                          fontSize: 18,
+                        }}
+                      >
+                        <span
+                          className="loader"
+                          style={{
+                            display: "inline-block",
+                            width: 32,
+                            height: 32,
+                            border: "4px solid var(--border)",
+                            borderTop: "4px solid var(--accent-cyan)",
+                            borderRadius: "50%",
+                            animation: "spin 1s linear infinite",
+                            marginBottom: 16,
+                          }}
+                        />
+                        Loading workflow file...
+                      </div>
+                    );
+                  }
+
+                  if (
+                    !pipelineData ||
+                    !pipelineData.workflows ||
+                    pipelineData.workflows.length === 0
+                  )
                     return <div>No workflow file found.</div>;
                   let workflow = pipelineData.workflows[0];
                   if (selectedRunId) {
@@ -1020,7 +1104,9 @@ export default function RunExplorerPage() {
                       </pre>
                     );
                   }
-                  return <div>No workflow file found.</div>;
+                  return (
+                    <div>No workflow details found for this selection.</div>
+                  );
                 })()}
               </div>
             ) : null}
@@ -1092,6 +1178,6 @@ export default function RunExplorerPage() {
           }
         }
       `}</style>
-    </Shell>
+    </>
   );
 }

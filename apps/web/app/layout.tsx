@@ -4,6 +4,7 @@ import { Toaster } from "sonner";
 import { AuthProvider } from "../lib/auth/auth-context";
 import { OrganizationProvider } from "@/lib/organization/OrganizationContext";
 import { ProjectContextProvider } from "@/lib/project/ProjectContext";
+import { Shell } from "@/components/ui/Shell";
 
 export const metadata: Metadata = {
   title: "CI-Insight | Unified CI/CD Intelligence",
@@ -24,7 +25,9 @@ export default function RootLayout({
       <body>
         <OrganizationProvider>
           <ProjectContextProvider>
-            <AuthProvider>{children}</AuthProvider>
+            <AuthProvider>
+              <Shell>{children}</Shell>
+            </AuthProvider>
           </ProjectContextProvider>
         </OrganizationProvider>
         {/* Global Toasts */}

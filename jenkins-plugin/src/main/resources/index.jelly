@@ -1,0 +1,4 @@
+<?jelly escape-by-default='true'?>
+<div>
+    Automated integration with CI-Insight. Pushes build metadata and logs to the dashboard.
+</div>

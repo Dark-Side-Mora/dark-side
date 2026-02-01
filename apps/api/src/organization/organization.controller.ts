@@ -49,11 +49,7 @@ export class OrganizationController {
 
   @Post()
   async create(@Req() req, @Body() body: CreateOrganizationDto) {
-    const result = await this.orgService.createOrganization(
-      req.user.id,
-      body.name,
-      body.domain,
-    );
+    const result = await this.orgService.createOrganization(req.user.id, body);
     console.log('[OrganizationController] ✓ Organization created:', result);
     return result;
   }

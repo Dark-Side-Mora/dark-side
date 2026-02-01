@@ -2,573 +2,428 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Shell } from "../../components/ui/Shell";
+import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Input";
 import { useOrganization } from "../../lib/organization/useOrganization";
 import { useProject } from "../../lib/project/useProject";
 import { useGithubApp } from "@/lib/project/useGithubApp";
 import { useProjectContext } from "@/lib/project/ProjectContext";
+import { CreateWorkspaceModal } from "@/components/project/CreateWorkspaceModal";
+import { useJenkins } from "@/lib/project/useJenkins";
 
 export default function ProjectsPage() {
   const router = useRouter();
-  const { currentOrgId, loading: orgLoading } = useOrganization();
   const {
-    fetchProjects,
-    loading: projectLoading,
-    createProject,
-  } = useProject();
-  const { authorizeGithubApp, fetchInstallations } = useGithubApp();
-  const [projects, setProjects] = useState<any[]>([]);
-  const [showAddProject, setShowAddProject] = useState(false);
-  const [showPlatformChoice, setShowPlatformChoice] = useState(false);
-  const [githubAuthorized, setGithubAuthorized] = useState<boolean | null>(
-    null,
-  );
+    currentOrgId,
+    loading: orgLoading,
+    fetchOrganizations,
+  } = useOrganization();
+  const { fetchProjects, loading: projectLoading, projects } = useProject();
+
+  const { installGithubApp, syncInstallations, authorizeGithubApp } =
+    useGithubApp();
   const [githubLoading, setGithubLoading] = useState(false);
-  const [githubMessage, setGithubMessage] = useState("");
-  const [installations, setInstallations] = useState<any[]>([]);
-  const { checkGithubAppAuthorized } = useGithubApp();
-  const [selectedRepos, setSelectedRepos] = useState<{
-    [key: number]: Set<string>;
-  }>({});
-  // FIX: Move useProjectContext hook call to top level
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [isTokenExpired, setIsTokenExpired] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const { setCurrentProjectId, setRepositoryUrl } = useProjectContext();
+  const { createOrganization, loading: creatingOrg } = useOrganization();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Prevent hydration mismatch
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
-    if (currentOrgId) {
-      fetchProjects(currentOrgId).then(setProjects);
-    } else {
-      console.log("No current organization selected.");
-    }
-  }, [currentOrgId]);
+    // Detect redirect success from GitHub
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("status") === "success") {
+      console.log(
+        "[ProjectsPage] GitHub sync success detected, refreshing data...",
+      );
 
-  if (!currentOrgId) {
-    return (
-      <Shell activePage="Projects">
-        <div style={{ marginBottom: "40px" }}>
+      const refreshData = async () => {
+        const orgs = await fetchOrganizations();
+        // If we have a current org, or if one was just auto-selected by the provider, refresh projects
+        if (currentOrgId) {
+          await fetchProjects(currentOrgId);
+        }
+      };
+
+      refreshData().catch(console.error);
+
+      // Remove query params from URL without refreshing
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [fetchOrganizations, fetchProjects, currentOrgId]);
+
+  const handleConnectClick = () => {
+    router.push("/integrations");
+  };
+
+  const handleReconnectClick = async () => {
+    setGithubLoading(true);
+    try {
+      const res = (await authorizeGithubApp(
+        window.location.origin + "/projects",
+      )) as any;
+      if (res.data?.authorizationUrl) {
+        window.location.href = res.data.authorizationUrl;
+      }
+    } catch (err) {
+      alert("Reconnection failed: " + (err as Error).message);
+    } finally {
+      setGithubLoading(false);
+    }
+  };
+
+  // Background Sync logic
+  const performBackgroundSync = async (silent = true) => {
+    try {
+      if (!silent) setSyncLoading(true);
+
+      await syncInstallations();
+      console.log("[ProjectsPage] Sync completed, refreshing data...");
+
+      // Refresh organizations and projects
+      await fetchOrganizations();
+      if (currentOrgId) {
+        await fetchProjects(currentOrgId);
+      }
+
+      if (!silent) {
+        alert("✅ Installations synced successfully!");
+      }
+    } catch (err) {
+      const message = (err as Error).message;
+      if (
+        message.includes("expired") ||
+        message.includes("Unauthorized") ||
+        message.includes("401")
+      ) {
+        setIsTokenExpired(true);
+        if (!silent) {
+          alert(
+            "⚠️ Connection Invalid: Please click the 'Reconnect GitHub' button appearing now.",
+          );
+        }
+      } else if (!silent) {
+        alert("Sync failed: " + message);
+      }
+    } finally {
+      if (!silent) setSyncLoading(false);
+    }
+  };
+
+  const handleManualCreate = async (
+    name: string,
+    domain: string,
+    provider: string,
+  ) => {
+    try {
+      await createOrganization(name, domain, provider);
+      await fetchOrganizations();
+    } catch (err) {
+      alert("Failed to create workspace: " + (err as Error).message);
+    }
+  };
+
+  // 1. Instant Response to Organization Switching
+  useEffect(() => {
+    if (isMounted && currentOrgId) {
+      console.log(
+        `[ProjectsPage] Org switch detected: ${currentOrgId}. Fetching projects...`,
+      );
+      fetchProjects(currentOrgId);
+    }
+  }, [isMounted, currentOrgId, fetchProjects]);
+
+  // 2. Background Sync (Initial mount & Window Focus)
+  useEffect(() => {
+    if (!isMounted) return;
+
+    // Initial background sync
+    performBackgroundSync(true);
+
+    const handleFocus = () => {
+      console.log(
+        "[ProjectsPage] Window focused, triggering background sync...",
+      );
+      performBackgroundSync(true);
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [isMounted]); // Removed currentOrgId from here to prevent redundant heavy syncs
+
+  return (
+    <>
+      <div
+        style={{
+          marginBottom: "40px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <div>
           <h2
             style={{ fontSize: "28px", fontWeight: 800, marginBottom: "8px" }}
           >
             Connected Projects
           </h2>
+          <p style={{ color: "var(--text-secondary)" }}>
+            Manage and monitor your CI/CD pipelines here.
+          </p>
         </div>
-        <div>Please select or create an organization to view projects.</div>
-      </Shell>
-    );
-  }
-
-  return (
-    <Shell activePage="Projects">
-      <div style={{ marginBottom: "40px" }}>
-        <h2 style={{ fontSize: "28px", fontWeight: 800, marginBottom: "8px" }}>
-          Connected Projects
-        </h2>
+        {isMounted && (
+          <div style={{ display: "flex", gap: "12px" }}>
+            {isTokenExpired && (
+              <Button
+                onClick={handleReconnectClick}
+                disabled={githubLoading}
+                style={{
+                  background: "rgba(220, 38, 38, 0.1)",
+                  border: "1px solid #ef4444",
+                  color: "#ef4444",
+                }}
+              >
+                {githubLoading ? "Redirecting..." : "⚠️ Reconnect GitHub"}
+              </Button>
+            )}
+            <Button variant="secondary" onClick={() => setIsModalOpen(true)}>
+              Create Workspace
+            </Button>
+            <Button onClick={handleConnectClick} disabled={githubLoading}>
+              {githubLoading ? "Redirecting..." : "Add New Project"}
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="projects-grid">
-        {orgLoading || projectLoading ? (
-          <div>Loading projects...</div>
-        ) : projects.length === 0 ? (
-          <div>No projects found for this organization.</div>
-        ) : (
-          projects.map((p) => (
-            <div
-              key={p.id}
-              onClick={() => {
-                setCurrentProjectId(p.id);
-                setRepositoryUrl(p.repositoryUrl);
-                router.push("/explorer");
-              }}
-              style={{
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-                outline: "none",
-              }}
-            >
-              <Card
-                style={
-                  {
-                    height: "100%",
-                    border: "1px solid var(--border)",
-                    transition: "border-color 0.2s ease, transform 0.2s ease",
-                    ":hover": {
-                      borderColor: "var(--accent-cyan)",
-                      transform: "translateY(-4px)",
-                    },
-                  } as any
-                }
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    marginBottom: "20px",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: "48px",
-                      height: "48px",
-                      borderRadius: "12px",
-                      backgroundColor: "rgba(255,255,255,0.03)",
-                      border: "1px solid var(--border)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "20px",
-                    }}
-                  >
-                    {p.provider === "github" ? "🐙" : "📦"}
-                  </div>
-                  <div
-                    style={{
-                      padding: "4px 10px",
-                      borderRadius: "6px",
-                      fontSize: "11px",
-                      fontWeight: 700,
-                      backgroundColor: "rgba(16, 185, 129, 0.1)",
-                      color: "var(--success)",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    {p.provider}
-                  </div>
-                </div>
-                <h3
-                  style={{
-                    fontSize: "18px",
-                    fontWeight: 700,
-                    marginBottom: "4px",
-                  }}
-                >
-                  {p.name}
-                </h3>
-                <p
-                  style={{
-                    fontSize: "13px",
-                    color: "var(--text-secondary)",
-                    marginBottom: "20px",
-                  }}
-                >
-                  {p.repositoryUrl}
-                </p>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: "16px",
-                    borderTop: "1px solid var(--border)",
-                    paddingTop: "16px",
-                  }}
-                >
-                  <div>
-                    <div
-                      style={{
-                        fontSize: "11px",
-                        color: "var(--text-secondary)",
-                        textTransform: "uppercase",
-                        marginBottom: "4px",
-                      }}
-                    >
-                      Created
-                    </div>
-                    <div style={{ fontSize: "14px", fontWeight: 600 }}>
-                      {new Date(p.createdAt).toLocaleString()}
-                    </div>
-                  </div>
-                  <div>
-                    <div
-                      style={{
-                        fontSize: "11px",
-                        color: "var(--text-secondary)",
-                        textTransform: "uppercase",
-                        marginBottom: "4px",
-                      }}
-                    >
-                      Pipelines
-                    </div>
-                    <div style={{ fontSize: "14px", fontWeight: 600 }}>
-                      {p.pipelines?.length ?? 0}
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          ))
-        )}
-
-        {showAddProject && !showPlatformChoice ? (
+        {!isMounted ? null : !currentOrgId && !orgLoading ? (
           <div
             style={{
-              border: "1px solid var(--border)",
-              borderRadius: "16px",
-              background: "var(--background)",
-              padding: "32px",
-              margin: "24px 0",
-              maxWidth: 600,
-              width: "100%",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+              gridColumn: "1 / -1",
+              padding: "80px 40px",
+              borderRadius: "24px",
+              background: "rgba(255, 255, 255, 0.02)",
+              border: "1px dashed var(--border)",
+              textAlign: "center",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "24px",
             }}
           >
-            <h2 style={{ fontSize: "22px", fontWeight: 700, marginBottom: 16 }}>
-              Add New Project (GitHub App)
-            </h2>
-            {githubAuthorized === null && (
-              <div style={{ marginBottom: 12 }}>
-                Checking GitHub authorization...
-              </div>
-            )}
-            {githubAuthorized === false && (
-              <button
-                onClick={async () => {
-                  setGithubLoading(true);
-                  setGithubMessage("");
-                  try {
-                    const data = (await authorizeGithubApp(
-                      window.location.origin + "/projects",
-                    )) as any;
-                    if (data.data?.authorizationUrl) {
-                      window.location.href = data.data.authorizationUrl;
-                    }
-                  } catch (error) {
-                    setGithubMessage("Error: " + (error as Error).message);
-                  } finally {
-                    setGithubLoading(false);
-                  }
-                }}
-                disabled={githubLoading}
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: "8px",
-                  background: "var(--accent-cyan)",
-                  color: "#fff",
-                  fontWeight: 700,
-                  border: "none",
-                  marginBottom: 12,
-                  cursor: githubLoading ? "not-allowed" : "pointer",
-                }}
+            <div style={{ fontSize: "60px" }}>🐙</div>
+            <h3 style={{ fontSize: "28px", fontWeight: 700 }}>
+              Discover your Projects
+            </h3>
+            <p
+              style={{
+                color: "var(--text-secondary)",
+                maxWidth: "550px",
+                fontSize: "17px",
+                lineHeight: "1.6",
+              }}
+            >
+              To see your workflows, connect CI-Insight to your GitHub account.
+              We'll automatically discover your organizations, personal
+              workspaces, and repositories.
+            </p>
+            <div style={{ display: "flex", gap: "12px" }}>
+              <Button
+                onClick={handleConnectClick}
+                style={{ padding: "16px 40px", fontSize: "16px" }}
               >
-                {githubLoading ? "Loading..." : "Install GitHub App"}
-              </button>
-            )}
-            {githubAuthorized === true && (
-              <button
-                onClick={async () => {
-                  setGithubLoading(true);
-                  setGithubMessage("");
-                  try {
-                    const data = (await fetchInstallations(true)) as any;
-                    if (data.data?.installations) {
-                      setInstallations(data.data.installations);
-                      setGithubMessage(
-                        `Found ${data.data.installations.length} installations`,
-                      );
-                    } else {
-                      setGithubMessage(
-                        "No GitHub App installations found. Please install the app first.",
-                      );
-                    }
-                  } catch (error) {
-                    setGithubMessage("Error: " + (error as Error).message);
-                  } finally {
-                    setGithubLoading(false);
-                  }
-                }}
-                disabled={githubLoading}
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: "8px",
-                  background: "var(--border)",
-                  color: "var(--text-primary)",
-                  fontWeight: 700,
-                  border: "none",
-                  marginLeft: 12,
-                  marginBottom: 12,
-                  cursor: githubLoading ? "not-allowed" : "pointer",
-                }}
+                Get Started with GitHub
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setIsModalOpen(true)}
+                style={{ padding: "16px 40px", fontSize: "16px" }}
               >
-                Fetch Installations
-              </button>
-            )}
-            {githubMessage && (
+                Create Manual Workspace
+              </Button>
+            </div>
+          </div>
+        ) : orgLoading || (projectLoading && projects.length === 0) ? (
+          <div
+            style={{
+              gridColumn: "1 / -1",
+              padding: "40px",
+              textAlign: "center",
+            }}
+          >
+            <div className="flex flex-col items-center gap-4">
+              <span className="text-xl animate-pulse">
+                Loading your projects...
+              </span>
+            </div>
+          </div>
+        ) : projects.length === 0 ? (
+          <div
+            onClick={handleConnectClick}
+            style={{
+              gridColumn: "1 / -1",
+              padding: "60px",
+              borderRadius: "16px",
+              border: "2px dashed var(--border)",
+              textAlign: "center",
+              cursor: "pointer",
+              color: "var(--text-secondary)",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "40px",
+                display: "block",
+                marginBottom: "16px",
+              }}
+            >
+              +
+            </span>
+            <span style={{ fontWeight: 600 }}>
+              {githubLoading
+                ? "Redirecting to GitHub..."
+                : "No projects found in this organization. Click to add new projects."}
+            </span>
+          </div>
+        ) : (
+          <>
+            {projects.map((p) => (
               <div
+                key={p.id}
+                onClick={() => {
+                  setCurrentProjectId(p.id);
+                  setRepositoryUrl(p.repositoryUrl);
+                  router.push("/explorer");
+                }}
                 style={{
-                  margin: "12px 0",
-                  color: githubMessage.includes("Error")
-                    ? "var(--error)"
-                    : "var(--success)",
-                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                  outline: "none",
                 }}
               >
-                {githubMessage}
-              </div>
-            )}
-            {installations.length > 0 && (
-              <div style={{ marginTop: 24 }}>
-                <h3
-                  style={{ fontSize: "18px", fontWeight: 700, marginBottom: 8 }}
-                >
-                  Installed on Accounts
-                </h3>
-                {installations.map((installation) => (
-                  <div
-                    key={installation.id}
-                    style={{
+                <Card
+                  style={
+                    {
+                      height: "100%",
                       border: "1px solid var(--border)",
-                      borderRadius: "10px",
-                      padding: 16,
-                      marginBottom: 16,
-                      background: "rgba(255,255,255,0.01)",
+                      transition: "border-color 0.2s ease, transform 0.2s ease",
+                      ":hover": {
+                        borderColor: "var(--accent-cyan)",
+                        transform: "translateY(-4px)",
+                      },
+                    } as any
+                  }
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      marginBottom: "20px",
                     }}
                   >
                     <div
                       style={{
+                        width: "48px",
+                        height: "48px",
+                        borderRadius: "12px",
+                        backgroundColor: "rgba(255,255,255,0.03)",
+                        border: "1px solid var(--border)",
                         display: "flex",
                         alignItems: "center",
-                        marginBottom: 8,
+                        justifyContent: "center",
+                        fontSize: "20px",
                       }}
                     >
-                      <span style={{ fontWeight: 700, fontSize: 16 }}>
-                        {installation.accountLogin}
-                      </span>
-                      <span
-                        style={{
-                          marginLeft: 12,
-                          padding: "2px 8px",
-                          borderRadius: 6,
-                          background: "var(--border)",
-                          fontSize: 12,
-                        }}
-                      >
-                        {installation.accountType}
-                      </span>
-                      <span
-                        style={{
-                          marginLeft: 8,
-                          padding: "2px 8px",
-                          borderRadius: 6,
-                          background: "var(--border)",
-                          fontSize: 12,
-                        }}
-                      >
-                        {installation.repositorySelection === "all"
-                          ? "All Repos"
-                          : "Selected Repos"}
-                      </span>
-                      <span
-                        style={{
-                          marginLeft: 8,
-                          padding: "2px 8px",
-                          borderRadius: 6,
-                          background:
-                            installation.status === "active"
-                              ? "var(--success-bg)"
-                              : "var(--border)",
-                          color:
-                            installation.status === "active"
-                              ? "var(--success)"
-                              : "var(--text-secondary)",
-                          fontSize: 12,
-                        }}
-                      >
-                        {installation.status}
-                      </span>
+                      {p.provider === "github" ? "🐙" : "📦"}
                     </div>
                     <div
                       style={{
-                        fontSize: 13,
-                        color: "var(--text-secondary)",
-                        marginBottom: 8,
+                        padding: "4px 10px",
+                        borderRadius: "6px",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        backgroundColor: "rgba(16, 185, 129, 0.1)",
+                        color: "var(--success)",
+                        textTransform: "uppercase",
                       }}
                     >
-                      {installation.repositoryCount} repositories
-                    </div>
-                    <div style={{ marginBottom: 8 }}>
-                      <strong>Connected Repositories:</strong>
-                      <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
-                        {installation.repositories.map((repo: any) => (
-                          <li
-                            key={repo.id}
-                            style={{
-                              padding: "2px 0",
-                              fontSize: 13,
-                              display: "flex",
-                              alignItems: "center",
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              style={{ marginRight: 8 }}
-                              checked={
-                                selectedRepos[installation.id]?.has(
-                                  repo.fullName,
-                                ) || false
-                              }
-                              disabled={projects
-                                .map((pr) => pr.repositoryUrl)
-                                .includes(repo.fullName)}
-                              onChange={(e) => {
-                                setSelectedRepos((prev) => {
-                                  const newSelected = new Set(
-                                    prev[installation.id] || [],
-                                  );
-                                  if (e.target.checked) {
-                                    newSelected.add(repo.fullName);
-                                  } else {
-                                    newSelected.delete(repo.fullName);
-                                  }
-                                  return {
-                                    ...prev,
-                                    [installation.id]: newSelected,
-                                  };
-                                });
-                              }}
-                            />
-                            <span>
-                              {repo.fullName}{" "}
-                              <b>
-                                {projects
-                                  .map((pr) => pr.repositoryUrl)
-                                  .includes(repo.fullName)
-                                  ? "(Already Added)"
-                                  : ""}
-                              </b>
-                            </span>
-                            {repo.private && (
-                              <span
-                                style={{
-                                  marginLeft: 6,
-                                  padding: "2px 6px",
-                                  borderRadius: 4,
-                                  background: "var(--border)",
-                                  fontSize: 11,
-                                }}
-                              >
-                                Private
-                              </span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button
-                        onClick={() =>
-                          window.open(
-                            `https://github.com/settings/installations/${installation.installationId}`,
-                            "_blank",
-                          )
-                        }
-                        style={{
-                          padding: "6px 14px",
-                          borderRadius: 6,
-                          background: "var(--border)",
-                          color: "var(--text-primary)",
-                          fontWeight: 600,
-                          border: "none",
-                          cursor: "pointer",
-                        }}
-                        disabled={githubLoading}
-                      >
-                        ⚙️ Configure in GitHub
-                      </button>
-                      <button
-                        onClick={async () => {
-                          setGithubLoading(true);
-                          setGithubMessage("");
-                          try {
-                            const repoList = installation.repositories.filter(
-                              (repo: any) =>
-                                selectedRepos[installation.id]?.has(
-                                  repo.fullName,
-                                ),
-                            );
-                            for (const repo of repoList) {
-                              await createProject(currentOrgId!, {
-                                organizationId: currentOrgId!,
-                                name: repo.name,
-                                provider: "github",
-                                repositoryUrl:
-                                  repo.htmlUrl || repo.url || repo.fullName,
-                                repoData: repo,
-                              });
-                            }
-                            setGithubMessage(
-                              `Imported ${repoList.length} project(s)`,
-                            );
-                            // Optionally refresh projects list
-                            fetchProjects(currentOrgId!).then(setProjects);
-                          } catch (error) {
-                            setGithubMessage(
-                              "Error: " + (error as Error).message,
-                            );
-                          } finally {
-                            setGithubLoading(false);
-                          }
-                        }}
-                        style={{
-                          padding: "6px 14px",
-                          borderRadius: 6,
-                          background: "var(--border)",
-                          color: "var(--text-primary)",
-                          fontWeight: 600,
-                          border: "none",
-                          cursor: "pointer",
-                        }}
-                        disabled={githubLoading}
-                      >
-                        Import to projects
-                      </button>
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: "var(--text-secondary)",
-                        marginTop: 8,
-                      }}
-                    >
-                      Tip: Click "Configure in GitHub" to add/remove
-                      repositories
+                      {p.provider}
                     </div>
                   </div>
-                ))}
+                  <h3
+                    style={{
+                      fontSize: "18px",
+                      fontWeight: 700,
+                      marginBottom: "4px",
+                    }}
+                  >
+                    {p.name}
+                  </h3>
+                  <p
+                    style={{
+                      fontSize: "13px",
+                      color: "var(--text-secondary)",
+                      marginBottom: "20px",
+                    }}
+                  >
+                    {p.repositoryUrl}
+                  </p>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "16px",
+                      borderTop: "1px solid var(--border)",
+                      paddingTop: "16px",
+                    }}
+                  >
+                    <div>
+                      <div
+                        style={{
+                          fontSize: "11px",
+                          color: "var(--text-secondary)",
+                          textTransform: "uppercase",
+                          marginBottom: "4px",
+                        }}
+                      >
+                        Created
+                      </div>
+                      <div style={{ fontSize: "14px", fontWeight: 600 }}>
+                        {new Date(p.createdAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <div>
+                      <div
+                        style={{
+                          fontSize: "11px",
+                          color: "var(--text-secondary)",
+                          textTransform: "uppercase",
+                          marginBottom: "4px",
+                        }}
+                      >
+                        Pipelines
+                      </div>
+                      <div style={{ fontSize: "14px", fontWeight: 600 }}>
+                        {p.pipelines?.length ?? 0}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
               </div>
-            )}
-            <button
-              onClick={() => {
-                setShowAddProject(false);
-                setShowPlatformChoice(false);
-              }}
+            ))}
+
+            {/* Add Project Card */}
+            <div
+              onClick={handleConnectClick}
               style={{
-                marginTop: 16,
-                padding: "8px 18px",
-                borderRadius: 8,
-                background: "var(--border)",
-                color: "var(--text-primary)",
-                fontWeight: 700,
-                border: "none",
-                cursor: "pointer",
-              }}
-            >
-              Close
-            </button>
-          </div>
-        ) : !showAddProject && !showPlatformChoice ? (
-          <div
-            onClick={async () => {
-              setShowAddProject(false);
-              setShowPlatformChoice(true);
-              setGithubAuthorized(null);
-              try {
-                const result = (await checkGithubAppAuthorized()) as any;
-                setGithubAuthorized(result.data?.installations.length > 0);
-              } catch {
-                setGithubAuthorized(false);
-              }
-            }}
-            style={
-              {
                 border: "2px dashed var(--border)",
                 borderRadius: "16px",
                 display: "flex",
@@ -579,79 +434,46 @@ export default function ProjectsPage() {
                 cursor: "pointer",
                 color: "var(--text-secondary)",
                 transition: "all 0.2s ease",
-                ":hover": {
-                  borderColor: "var(--accent-cyan)",
-                  color: "var(--text-primary)",
-                },
-              } as any
-            }
-          >
-            <span style={{ fontSize: "24px", marginBottom: "8px" }}>+</span>
-            <span style={{ fontSize: "14px", fontWeight: 600 }}>
-              Add New Project
-            </span>
-          </div>
-        ) : (
-          <div>
-            {/*Add the platform selection UI here */}
-            <h2 style={{ fontSize: "22px", fontWeight: 700, marginBottom: 16 }}>
-              Select Platform
-            </h2>
-            <div style={{ display: "flex", gap: "16px" }}>
-              <button
-                onClick={() => {
-                  setShowPlatformChoice(false);
-                  setShowAddProject(true);
-                }}
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: "8px",
-                  background: "var(--accent-cyan)",
-                  color: "#fff",
-                  fontWeight: 700,
-                  border: "none",
-                  cursor: "pointer",
-                }}
-              >
-                GitHub
-              </button>
-              <button
-                onClick={() => {
-                  // Future platform options can be handled here
-                }}
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: "8px",
-                  background: "var(--border)",
-                  color: "var(--text-primary)",
-                  fontWeight: 700,
-                  border: "none",
-                  cursor: "not-allowed",
-                }}
-                disabled
-              >
-                Other Platforms (Coming Soon)
-              </button>
+              }}
+              className="add-project-card"
+            >
+              <span style={{ fontSize: "32px", marginBottom: "8px" }}>+</span>
+              <span style={{ fontSize: "14px", fontWeight: 600 }}>
+                {githubLoading ? "Redirecting..." : "Add New Project"}
+              </span>
             </div>
-          </div>
+          </>
         )}
       </div>
 
+      <CreateWorkspaceModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onCreate={handleManualCreate}
+        loading={creatingOrg}
+      />
+
       <style jsx>{`
-        div:hover {
-          border-color: var(--accent-cyan);
-        }
         .projects-grid {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
           gap: 24px;
+        }
+        .add-project-card:hover {
+          border-color: var(--accent-cyan);
+          color: var(--text-primary);
+          background: rgba(255, 255, 255, 0.01);
         }
         @media (max-width: 768px) {
           .projects-grid {
             grid-template-columns: 1fr;
           }
         }
+        .projects-grid {
+          transition: opacity 0.3s ease;
+          opacity: ${projectLoading ? 0.7 : 1};
+        }
       `}</style>
-    </Shell>
+    </>
   );
 }

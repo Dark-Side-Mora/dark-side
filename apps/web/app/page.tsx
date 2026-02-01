@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { Shell } from "../components/ui/Shell";
 import { Card } from "../components/ui/Input";
 
 interface StatCardProps {
@@ -100,7 +99,7 @@ const EmptyChart = ({ message }: { message: string }) => (
 
 export default function Dashboard() {
   return (
-    <Shell activePage="Dashboard">
+    <>
       {/* Header */}
       <div style={{ marginBottom: "32px" }}>
         <h2 style={{ fontSize: "32px", fontWeight: 800, marginBottom: "4px" }}>
@@ -267,6 +266,6 @@ export default function Dashboard() {
           }
         }
       `}</style>
-    </Shell>
+    </>
   );
 }

@@ -1,17 +1,53 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Shell } from "../../components/ui/Shell";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Input";
 import { useAiSecurity } from "../../lib/project/useAi";
+import { useProjectContext } from "../../lib/project/ProjectContext";
+
+// Simple spinner component
+const Spinner = () => (
+  <div
+    style={{
+      width: "20px",
+      height: "20px",
+      border: "3px solid rgba(255,255,255,0.3)",
+      borderRadius: "50%",
+      borderTopColor: "#fff",
+      animation: "spin 1s ease-in-out infinite",
+    }}
+  >
+    <style jsx>{`
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    `}</style>
+  </div>
+);
+
+// Map severity to color
+const getSeverityColor = (severity: string) => {
+  switch (severity.toLowerCase()) {
+    case "critical":
+      return "var(--error)";
+    case "high":
+      return "#F97316"; // Orange
+    case "medium":
+      return "#EAB308"; // Yellow
+    case "low":
+      return "#3B82F6"; // Blue
+    default:
+      return "var(--text-secondary)";
+  }
+};
 
 export default function SecurityPage() {
-  const [userId] = useState("test-user-123");
-  const [selectedRepo, setSelectedRepo] = useState("");
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const dropdownTriggerRef = useRef<HTMLDivElement>(null);
-  const dropdownMenuRef = useRef<HTMLDivElement>(null);
+  const { projectId } = useProjectContext();
+  const [userId] = useState("user-id-placeholder"); // TODO: Get real user ID from auth context
+
   const {
     installations,
     securityAnalysis,
@@ -19,23 +55,24 @@ export default function SecurityPage() {
     message,
     fetchInstallations,
     fetchSecurityAnalysis,
-    setSecurityAnalysis,
-    setMessage,
   } = useAiSecurity(userId);
 
-  // Fetch installations on mount
+  const [analyzing, setAnalyzing] = useState(false);
+  const [expandedSolution, setExpandedSolution] = useState<number | null>(null);
+
+  // Placeholder for repository selection logic
+  const [selectedRepo, setSelectedRepo] = useState("");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownTriggerRef = useRef<HTMLDivElement>(null);
+  const dropdownMenuRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     fetchInstallations();
   }, [fetchInstallations]);
 
-  // Handler for scan button
-  const handleAnalyzeSecurity = () => {
-    if (selectedRepo) fetchSecurityAnalysis(selectedRepo);
-  };
-
   // Flatten all repos for dropdown
-  const repos: Repository[] = installations.flatMap(
-    (inst: Installation) => inst.repositories,
+  const repos: any[] = installations.flatMap(
+    (inst: any) => inst.repositories || [],
   );
 
   // Close dropdown on outside click
@@ -54,6 +91,15 @@ export default function SecurityPage() {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [dropdownOpen]);
+
+  // Handler for scan button
+  const handleAnalyzeSecurity = async () => {
+    if (selectedRepo) {
+      setAnalyzing(true);
+      await fetchSecurityAnalysis(selectedRepo);
+      setAnalyzing(false);
+    }
+  };
 
   // Helper for color
   type RiskLevel = "critical" | "high" | "medium" | "low" | string;
@@ -101,10 +147,8 @@ export default function SecurityPage() {
     }
   };
 
-  const [expandedSolution, setExpandedSolution] = useState<number | null>(null);
-
   return (
-    <Shell activePage="Security">
+    <div style={{ padding: "20px" }}>
       <div className="security-grid">
         <style jsx>{`
           .security-grid {
@@ -164,9 +208,9 @@ export default function SecurityPage() {
             </div>
             <Button
               onClick={handleAnalyzeSecurity}
-              disabled={loading || !selectedRepo}
+              disabled={loading || analyzing || !selectedRepo}
             >
-              {loading ? "Scanning..." : "Scan Repository"}
+              {loading || analyzing ? "Scanning..." : "Scan Repository"}
             </Button>
           </div>
 
@@ -264,6 +308,9 @@ export default function SecurityPage() {
               </div>
             </div>
           )}
+
+          {/* Results */}
+          {message && <div style={{ marginBottom: 20 }}>{message}</div>}
 
           {/* Findings from AI */}
           {securityAnalysis && securityAnalysis.issues && (
@@ -375,7 +422,7 @@ export default function SecurityPage() {
                       {/* Ignore button hidden for now */}
                     </div>
                   </div>
-                  {/* Solution details, toggled by Remediate */}
+                  {/* Solution details */}
                   {expandedSolution === i && (
                     <div
                       style={{
@@ -417,7 +464,7 @@ export default function SecurityPage() {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-          {/* Security Scoreboard - dynamic from AI */}
+          {/* Security Scoreboard */}
           <Card title="Security Scoreboard">
             <div
               style={{
@@ -537,7 +584,7 @@ export default function SecurityPage() {
             </div>
           </Card>
 
-          {/* AI Suggestions - dynamic from AI */}
+          {/* AI Suggestions */}
           <Card title="Suggested Actions (AI)">
             <p
               style={{
@@ -555,6 +602,7 @@ export default function SecurityPage() {
           </Card>
         </div>
       </div>
-    </Shell>
+      <p>Security dashboard content coming soon...</p>
+    </div>
   );
 }
