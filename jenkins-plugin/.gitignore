@@ -1,0 +1,9 @@
+target/
+*.class
+*.log
+.settings/
+.project
+.classpath
+.factorypath
+*.hpi
+*.jar
