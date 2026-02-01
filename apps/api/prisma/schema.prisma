@@ -97,6 +97,7 @@ model SecurityFinding {
 model IntegrationConnection {
   id                String                @id @default(uuid())
   userId            String                // Supabase Auth User ID
+  organizationId    String?               // Optional: Link to a specific workspace
   provider          String                // 'github', 'jenkins', etc.
   accessToken       String                // Encrypted token
   refreshToken      String?               // Optional refresh token
@@ -108,7 +109,7 @@ model IntegrationConnection {
   organizationAccess OrganizationAccess[]
   githubInstallations GitHubInstallation[]
 
-  @@unique([userId, provider])
+  @@unique([userId, provider, organizationId])
   @@index([userId])
 }
 

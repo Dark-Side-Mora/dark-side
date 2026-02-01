@@ -210,9 +210,10 @@ export class GithubService {
     // Upsert connection
     const connection = await this.prisma.integrationConnection.upsert({
       where: {
-        userId_provider: {
+        userId_provider_organizationId: {
           userId,
           provider: 'github',
+          organizationId: null as any,
         },
       },
       update: {
@@ -223,6 +224,7 @@ export class GithubService {
       create: {
         userId,
         provider: 'github',
+        organizationId: null as any,
         accessToken: encryptedToken,
         status: 'active',
       },
@@ -264,9 +266,10 @@ export class GithubService {
     // Find the connection
     const connection = await this.prisma.integrationConnection.findUnique({
       where: {
-        userId_provider: {
+        userId_provider_organizationId: {
           userId,
           provider: 'github',
+          organizationId: null as any,
         },
       },
     });
@@ -298,9 +301,10 @@ export class GithubService {
   async getUserConnections(userId: string) {
     const connection = await this.prisma.integrationConnection.findUnique({
       where: {
-        userId_provider: {
+        userId_provider_organizationId: {
           userId,
           provider: 'github',
+          organizationId: null as any,
         },
       },
       include: {
@@ -352,9 +356,10 @@ export class GithubService {
   async getAccessToken(userId: string): Promise<string> {
     const connection = await this.prisma.integrationConnection.findUnique({
       where: {
-        userId_provider: {
+        userId_provider_organizationId: {
           userId,
           provider: 'github',
+          organizationId: null as any,
         },
       },
     });

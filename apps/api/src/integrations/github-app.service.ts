@@ -205,9 +205,10 @@ export class GithubAppService {
 
     const connection = await this.prisma.integrationConnection.upsert({
       where: {
-        userId_provider: {
+        userId_provider_organizationId: {
           userId,
           provider: 'github-app',
+          organizationId: null as any,
         },
       },
       update: {
@@ -218,6 +219,7 @@ export class GithubAppService {
       create: {
         userId,
         provider: 'github-app',
+        organizationId: null as any,
         accessToken: encryptedToken,
         status: 'active',
       },
@@ -501,9 +503,10 @@ export class GithubAppService {
     // 3. Best-Effort Discovery: Attempt to find NEW installations using User OAuth token
     const connection = await this.prisma.integrationConnection.findUnique({
       where: {
-        userId_provider: {
+        userId_provider_organizationId: {
           userId,
           provider: 'github-app',
+          organizationId: null as any,
         },
       },
     });
