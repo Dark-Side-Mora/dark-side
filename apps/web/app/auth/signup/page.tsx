@@ -64,6 +64,7 @@ export default function SignupPage() {
     setAuthError(null);
     const { error } = await signInWithGoogle();
     if (error) {
+      console.log(error);
       setAuthError(error.message);
     }
   };
