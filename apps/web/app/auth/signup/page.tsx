@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { IconSun } from "../../../components/ui/IconSun";
@@ -11,8 +10,7 @@ import { LogoIcon } from "../../../components/ui/LogoIcon";
 import { useAuth } from "../../../lib/auth";
 
 export default function SignupPage() {
-  const router = useRouter();
-  const { signUp, signInWithGoogle, loading, error } = useAuth();
+  const { signUp, signInWithGoogle, loading } = useAuth();
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -315,7 +313,7 @@ export default function SignupPage() {
               >
                 <strong>✓ Check your email!</strong>
                 <br />
-                We've sent a confirmation link to <strong>{email}</strong>.
+                We&apos;ve sent a confirmation link to <strong>{email}</strong>.
                 <br />
                 Click it to activate your account and start using CI-Insight.
               </div>
@@ -334,7 +332,7 @@ export default function SignupPage() {
                   lineHeight: "1.6",
                 }}
               >
-                <strong>Didn't receive the email?</strong>
+                <strong>Didn&apos;t receive the email?</strong>
                 <br />
                 Check your spam folder or{" "}
                 <button

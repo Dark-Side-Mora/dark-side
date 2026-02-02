@@ -9,12 +9,10 @@ import { IconSun } from "../../../components/ui/IconSun";
 import { IconMoon } from "../../../components/ui/IconMoon";
 import { LogoIcon } from "../../../components/ui/LogoIcon";
 import { useAuth } from "../../../lib/auth";
-import { useAuthContext } from "../../../lib/auth/auth-context";
 
 export default function LoginPage() {
   const router = useRouter();
   const { signIn, signInWithGoogle, loading } = useAuth();
-  const { isAuthenticated } = useAuthContext();
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
