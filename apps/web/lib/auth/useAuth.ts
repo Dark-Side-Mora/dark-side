@@ -64,8 +64,6 @@ export const useAuth = () => {
   };
 
   // Sign in with email and password
-  // Note: signInWithPassword does not take a redirectTo option in Supabase
-  // because it is a direct login. You handle the redirect in your component code.
   const signIn = async ({ email, password }: SignInCredentials) => {
     setLoading(true);
     setError(null);
@@ -104,6 +102,7 @@ export const useAuth = () => {
     setError(null);
 
     try {
+      console.log("[Auth] Initiating Google OAuth sign-in");
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -112,9 +111,11 @@ export const useAuth = () => {
       });
 
       if (error) throw error;
+      console.log("OAuth sign-in data pppppppppppppp:", data);
       return { data, error: null };
     } catch (err) {
       const authError = err as AuthError;
+      console.log("OAuth sign-in error:", authError);
       setError(authError);
       return { data: null, error: authError };
     } finally {
@@ -136,6 +137,7 @@ export const useAuth = () => {
       });
 
       if (error) throw error;
+      console.log("OAuth sign-in data:", data);
       return { data, error: null };
     } catch (err) {
       const authError = err as AuthError;
