@@ -1050,7 +1050,6 @@ export default function LearningPage() {
           </Card>
         </div>
       </div>
-      <p>Learning resources content coming soon...</p>
     </div>
   );
 }
