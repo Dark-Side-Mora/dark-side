@@ -501,13 +501,13 @@ export class GithubAppService {
     }
 
     // 3. Best-Effort Discovery: Attempt to find NEW installations using User OAuth token
-    const connection = await this.prisma.integrationConnection.findUnique({
+    const connection = await (
+      this.prisma.integrationConnection as any
+    ).findFirst({
       where: {
-        userId_provider_organizationId: {
-          userId,
-          provider: 'github-app',
-          organizationId: null as any,
-        },
+        userId,
+        provider: 'github-app',
+        organizationId: null,
       },
     });
 

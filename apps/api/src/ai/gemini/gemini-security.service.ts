@@ -128,20 +128,48 @@ Return ONLY valid JSON, no additional text.`;
         throw new Error('No JSON found in response');
       }
 
-      const parsed = JSON.parse(jsonMatch[0]);
+      let jsonText = jsonMatch[0];
 
-      // Validate response structure
-      if (
-        !parsed.overallRisk ||
-        !parsed.summary ||
-        !Array.isArray(parsed.issues)
-      ) {
-        throw new Error('Invalid response structure');
+      // Unescape JSON properly - Gemini might send escaped content
+      try {
+        // First attempt: try parsing as-is
+        const parsed = JSON.parse(jsonText);
+
+        // Validate response structure
+        if (
+          !parsed.overallRisk ||
+          !parsed.summary ||
+          !Array.isArray(parsed.issues)
+        ) {
+          throw new Error('Invalid response structure');
+        }
+
+        return parsed;
+      } catch (parseError) {
+        // Second attempt: fix common escaping issues
+        // Remove extra backslashes before quotes within strings
+        jsonText = jsonText.replace(/\\"/g, '"');
+        // Fix newlines in strings
+        jsonText = jsonText.replace(/\\n/g, ' ');
+        // Remove control characters
+        jsonText = jsonText.replace(/[\x00-\x1F\x7F]/g, ' ');
+
+        const parsed = JSON.parse(jsonText);
+
+        // Validate response structure
+        if (
+          !parsed.overallRisk ||
+          !parsed.summary ||
+          !Array.isArray(parsed.issues)
+        ) {
+          throw new Error('Invalid response structure');
+        }
+
+        return parsed;
       }
-
-      return parsed;
     } catch (error) {
       console.error('Error parsing Gemini response:', error);
+      console.error('Raw text length:', text.length);
       // Return default response if parsing fails
       return {
         overallRisk: 'medium',

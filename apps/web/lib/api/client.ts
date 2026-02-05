@@ -151,7 +151,11 @@ export async function apiGet<T>(
 
   if (!response.ok) {
     const text = await response.text();
-    console.error(`[API] GET ${url} failed:`, response.status, text);
+    console.error(`[API] GET ${url} failed:`, {
+      status: response.status,
+      statusText: response.statusText,
+      body: text,
+    });
     throw new Error(
       `API Error ${response.status}: ${text || response.statusText}`,
     );
