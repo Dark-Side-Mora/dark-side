@@ -5,6 +5,7 @@ import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Input";
 import { useAiSecurity } from "../../lib/project/useAi";
 import { useProjectContext } from "../../lib/project/ProjectContext";
+import { useAuthContext } from "../../lib/auth/auth-context";
 
 // Simple spinner component
 const Spinner = () => (
@@ -46,7 +47,8 @@ const getSeverityColor = (severity: string) => {
 
 export default function SecurityPage() {
   const { projectId } = useProjectContext();
-  const [userId] = useState("user-id-placeholder"); // TODO: Get real user ID from auth context
+  const { user, isLoading: authLoading } = useAuthContext();
+  const [userId, setUserId] = useState<string>("");
 
   const {
     installations,
@@ -66,9 +68,19 @@ export default function SecurityPage() {
   const dropdownTriggerRef = useRef<HTMLDivElement>(null);
   const dropdownMenuRef = useRef<HTMLDivElement>(null);
 
+  // Update userId when user is authenticated
   useEffect(() => {
-    fetchInstallations();
-  }, [fetchInstallations]);
+    if (user?.id) {
+      setUserId(user.id);
+    }
+  }, [user?.id]);
+
+  // Fetch installations when userId is available
+  useEffect(() => {
+    if (userId) {
+      fetchInstallations();
+    }
+  }, [userId, fetchInstallations]);
 
   // Flatten all repos for dropdown
   const repos: any[] = installations.flatMap(
@@ -146,6 +158,26 @@ export default function SecurityPage() {
         return "var(--accent-purple)";
     }
   };
+
+  // Show loading state while auth is being checked
+  if (authLoading || (userId === "" && !user)) {
+    return (
+      <div style={{ padding: "20px", textAlign: "center" }}>
+        <p>Loading authentication...</p>
+      </div>
+    );
+  }
+
+  // Show login prompt if not authenticated
+  if (!user) {
+    return (
+      <div style={{ padding: "20px", textAlign: "center" }}>
+        <p style={{ color: "var(--text-secondary)" }}>
+          Please sign in to access the Security Analyzer.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: "20px" }}>
@@ -310,7 +342,39 @@ export default function SecurityPage() {
           )}
 
           {/* Results */}
-          {message && <div style={{ marginBottom: 20 }}>{message}</div>}
+          {message && (
+            <div
+              style={{
+                marginBottom: 20,
+                padding: "12px 16px",
+                backgroundColor: "rgba(239, 68, 68, 0.1)",
+                borderLeft: "4px solid var(--error)",
+                borderRadius: "6px",
+                color: "var(--error)",
+                fontSize: "14px",
+              }}
+            >
+              {message}
+            </div>
+          )}
+
+          {/* No repos message */}
+          {!loading && repos.length === 0 && !message && (
+            <div
+              style={{
+                marginBottom: 20,
+                padding: "12px 16px",
+                backgroundColor: "rgba(100, 116, 139, 0.1)",
+                borderLeft: "4px solid var(--text-secondary)",
+                borderRadius: "6px",
+                color: "var(--text-secondary)",
+                fontSize: "14px",
+              }}
+            >
+              No repositories found. Install the GitHub App on your repositories
+              to get started.
+            </div>
+          )}
 
           {/* Findings from AI */}
           {securityAnalysis && securityAnalysis.issues && (
