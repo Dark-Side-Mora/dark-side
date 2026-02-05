@@ -112,7 +112,23 @@ export class GithubAppService {
     const installations = await this.fetchUserInstallations(accessToken);
 
     for (const installation of installations) {
-      await this.storeInstallation(userId, installation, accessToken);
+      try {
+        console.log(
+          `[GithubAppService] Storing installation ${installation.id} for user ${userId}`,
+        );
+        await this.storeInstallation(userId, installation, accessToken);
+        console.log(
+          `[GithubAppService] Successfully stored installation ${installation.id}`,
+        );
+      } catch (error) {
+        console.error(
+          `[GithubAppService] Error storing installation ${installation.id}:`,
+          error.message,
+        );
+        // Log the full error for debugging
+        console.error(error);
+        // Continue with next installation instead of failing completely
+      }
     }
 
     return { userId, redirectUri, installations };
@@ -203,27 +219,37 @@ export class GithubAppService {
   ) {
     const encryptedToken = this.encryptToken(userAccessToken);
 
-    const connection = await this.prisma.integrationConnection.upsert({
-      where: {
-        userId_provider_organizationId: {
+    // Find or create the connection using findFirst + create pattern (Prisma doesn't support null in unique constraints for upsert)
+    let connection = await (this.prisma.integrationConnection as any).findFirst(
+      {
+        where: {
+          userId,
+          provider: 'github-app',
+          organizationId: null,
+        },
+      },
+    );
+
+    if (!connection) {
+      connection = await this.prisma.integrationConnection.create({
+        data: {
           userId,
           provider: 'github-app',
           organizationId: null as any,
+          accessToken: encryptedToken,
+          status: 'active',
         },
-      },
-      update: {
-        accessToken: encryptedToken,
-        status: 'active',
-        updatedAt: new Date(),
-      },
-      create: {
-        userId,
-        provider: 'github-app',
-        organizationId: null as any,
-        accessToken: encryptedToken,
-        status: 'active',
-      },
-    });
+      });
+    } else {
+      connection = await this.prisma.integrationConnection.update({
+        where: { id: connection.id },
+        data: {
+          accessToken: encryptedToken,
+          status: 'active',
+          updatedAt: new Date(),
+        },
+      });
+    }
 
     console.log(`[GithubAppService] Connected GitHub App for user ${userId}`);
     // Create or update installation
