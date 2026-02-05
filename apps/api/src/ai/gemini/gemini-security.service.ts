@@ -188,4 +188,97 @@ Return ONLY valid JSON, no additional text.`;
       };
     }
   }
+
+  /**
+   * Generate AI-powered optimization suggestions for CI/CD pipelines
+   */
+  async generateOptimizationSuggestions(pipelineMetrics: {
+    pipelineHealth: number;
+    failedRuns: number;
+    totalRuns: number;
+    avgBuildDuration: number;
+    peakBuildTime: number;
+    projectCount: number;
+    recentActivities: Array<{ status: string; conclusion?: string }>;
+  }): Promise<
+    Array<{
+      id: string;
+      type: string;
+      title: string;
+      description: string;
+      impact: 'high' | 'medium' | 'low';
+      estimatedSavings?: string;
+    }>
+  > {
+    try {
+      const prompt = `You are a DevOps and CI/CD expert analyzing pipeline performance metrics. Based on the following data, provide 2-4 specific, actionable optimization suggestions.
+
+Pipeline Metrics:
+- Success Rate: ${pipelineMetrics.pipelineHealth}%
+- Failed Runs: ${pipelineMetrics.failedRuns} out of ${pipelineMetrics.totalRuns}
+- Average Build Duration: ${Math.round(pipelineMetrics.avgBuildDuration)}s (${Math.round(pipelineMetrics.avgBuildDuration / 60)}m)
+- Peak Build Time: ${Math.round(pipelineMetrics.peakBuildTime)}s
+- Total Projects: ${pipelineMetrics.projectCount}
+- Recent Build Statuses: ${pipelineMetrics.recentActivities
+        .slice(0, 10)
+        .map((a) => a.conclusion || a.status)
+        .join(', ')}
+
+Analyze the metrics and provide optimization suggestions in the following JSON format:
+{
+  "suggestions": [
+    {
+      "type": "performance|reliability|security|cost",
+      "title": "Brief title (max 50 chars)",
+      "description": "Detailed actionable recommendation (max 150 chars)",
+      "impact": "high|medium|low",
+      "estimatedSavings": "Optional: e.g., '~5 minutes per build' or '~30% faster builds'"
+    }
+  ]
+}
+
+Rules:
+1. If success rate < 80%, prioritize reliability improvements
+2. If avg build time > 5 minutes, suggest performance optimizations
+3. If builds are fast (<30s), acknowledge efficiency and suggest advanced monitoring
+4. Be specific and actionable
+5. Return ONLY valid JSON, no markdown formatting
+6. Provide 2-4 suggestions max`;
+
+      const response = await this.model.generateContent(prompt);
+      const text = response.response.text();
+
+      // Clean up markdown formatting if present
+      let cleanedText = text.trim();
+      if (cleanedText.startsWith('```json')) {
+        cleanedText = cleanedText
+          .replace(/```json\n?/g, '')
+          .replace(/```\n?/g, '');
+      }
+
+      const parsed = JSON.parse(cleanedText);
+
+      return parsed.suggestions.map((s: any, index: number) => ({
+        id: `ai-${index}`,
+        type: s.type,
+        title: s.title,
+        description: s.description,
+        impact: s.impact,
+        estimatedSavings: s.estimatedSavings,
+      }));
+    } catch (error) {
+      console.error('Error generating optimization suggestions:', error);
+      // Return default suggestion if AI fails
+      return [
+        {
+          id: 'default',
+          type: 'reliability',
+          title: 'System Running Smoothly',
+          description:
+            'Your pipelines are performing well! Consider implementing advanced monitoring and predictive analytics.',
+          impact: 'low',
+        },
+      ];
+    }
+  }
 }

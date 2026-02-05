@@ -282,6 +282,34 @@ model OrganizationMembership {
   @@index([userId])
 }
 
+// ============================================
+// Dashboard Metrics Cache
+// ============================================
+
+model DashboardMetricsCache {
+  id                      String   @id @default(uuid())
+  userId                  String
+  
+  // Metric values
+  totalProjects           Int
+  activeAlerts            Int
+  buildVolume             Int
+  pipelineHealthPercentage Int
+  
+  // JSON stored data
+  recentActivity          Json
+  reliabilityTrend        Json
+  optimizationSuggestions Json
+  resourceConsumption     Json
+  
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@unique([userId])
+  @@index([userId])
+  @@index([updatedAt])
+}
+
 model MembershipRequest {
   id             String   @id @default(uuid())
   organizationId String

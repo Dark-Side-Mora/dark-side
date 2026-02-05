@@ -8,6 +8,7 @@ import { PipelinesModule } from './pipelines/pipelines.module';
 import { LearningModule } from './learning/learning.module';
 import { AuthModule } from './auth/auth.module';
 import { OrganizationModule } from './organization/organization.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { OrganizationModule } from './organization/organization.module';
     LearningModule,
     OrganizationModule,
     InfrastructureModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],
