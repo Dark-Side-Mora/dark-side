@@ -763,276 +763,6 @@ export default function SettingsPage() {
             </div>
           </Card>
         );
-      case "Security":
-        return (
-          <div
-            style={{ display: "flex", flexDirection: "column", gap: "24px" }}
-          >
-            <Card title="Authentication">
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "20px",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: "15px", fontWeight: 600 }}>
-                      Two-Factor Authentication
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "13px",
-                        color: "var(--text-secondary)",
-                      }}
-                    >
-                      Add an extra layer of security to your account.
-                    </div>
-                  </div>
-                  <Button variant="secondary" size="sm">
-                    Enable
-                  </Button>
-                </div>
-                <div
-                  style={{
-                    borderTop: "1px solid var(--border)",
-                    paddingTop: "20px",
-                  }}
-                >
-                  <Button variant="secondary">Change Password</Button>
-                </div>
-              </div>
-            </Card>
-            <Card title="Access Tokens">
-              <p
-                style={{
-                  fontSize: "13px",
-                  color: "var(--text-secondary)",
-                  marginBottom: "16px",
-                }}
-              >
-                Generate personal access tokens to use the CI-Insight CLI or
-                API.
-              </p>
-              <Button variant="secondary" size="sm">
-                Generate New Token
-              </Button>
-            </Card>
-          </div>
-        );
-      case "Billing":
-        return (
-          <Card title="Subscription & Billing">
-            <div
-              style={{ display: "flex", flexDirection: "column", gap: "24px" }}
-            >
-              <div
-                style={{
-                  padding: "20px",
-                  backgroundColor: "rgba(6, 182, 212, 0.05)",
-                  borderRadius: "12px",
-                  border: "1px solid var(--accent-cyan)",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    color: "var(--accent-cyan)",
-                    marginBottom: "4px",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Current Plan
-                </div>
-                <div style={{ fontSize: "24px", fontWeight: 800 }}>
-                  Pro License
-                </div>
-                <div
-                  style={{
-                    fontSize: "14px",
-                    color: "var(--text-secondary)",
-                    marginTop: "4px",
-                  }}
-                >
-                  $49.00 / month • Renews on Nov 14, 2024
-                </div>
-              </div>
-              <div>
-                <h4
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: 600,
-                    marginBottom: "12px",
-                  }}
-                >
-                  Payment Method
-                </h4>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "16px",
-                    padding: "16px",
-                    border: "1px solid var(--border)",
-                    borderRadius: "12px",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: "40px",
-                      height: "24px",
-                      backgroundColor: "#333",
-                      borderRadius: "4px",
-                    }}
-                  />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: "14px", fontWeight: 600 }}>
-                      Visa ending in 4242
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        color: "var(--text-secondary)",
-                      }}
-                    >
-                      Expires 12/26
-                    </div>
-                  </div>
-                  <Button variant="ghost" size="sm">
-                    Edit
-                  </Button>
-                </div>
-              </div>
-              <Button variant="secondary">View Invoices</Button>
-            </div>
-          </Card>
-        );
-      case "Integrations":
-        return (
-          <div
-            style={{ display: "flex", flexDirection: "column", gap: "16px" }}
-          >
-            {[
-              {
-                name: "Supabase",
-                active: true,
-                desc: "Identity & Data Layer",
-                status: "Connected",
-              },
-              {
-                name: "GitHub Actions",
-                active: true,
-                desc: "Primary CI Provider",
-                status: "Connected",
-              },
-              {
-                name: "Gemini AI",
-                active: true,
-                desc: "Intelligent Diagnostics",
-                status: "Active",
-              },
-              {
-                name: "OpenSearch",
-                active: true,
-                desc: "Log Aggregator",
-                status: "Connected",
-              },
-              {
-                name: "Slack",
-                active: false,
-                desc: "Notifications",
-                status: "Disconnected",
-              },
-            ].map((app) => (
-              <Card
-                key={app.name}
-                glass={false}
-                style={{ padding: "16px 24px" }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "16px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: "40px",
-                        height: "40px",
-                        borderRadius: "8px",
-                        backgroundColor: "rgba(255,255,255,0.03)",
-                        border: "1px solid var(--border)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      {app.name === "GitHub Actions"
-                        ? "🐙"
-                        : app.name === "Slack"
-                          ? "💬"
-                          : "⚡"}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: "15px", fontWeight: 600 }}>
-                        {app.name}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          color: "var(--text-secondary)",
-                        }}
-                      >
-                        {app.desc}
-                      </div>
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "20px",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: 700,
-                        color: app.active
-                          ? "var(--success)"
-                          : "var(--text-secondary)",
-                      }}
-                    >
-                      {app.status}
-                    </span>
-                    <Button
-                      variant={app.active ? "secondary" : "primary"}
-                      size="sm"
-                    >
-                      {app.active ? "Manage" : "Connect"}
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-        );
       default:
         return null;
     }
@@ -1061,29 +791,26 @@ export default function SettingsPage() {
           marginBottom: "32px",
         }}
       >
-        {["Profile", "Organization", "Security", "Billing", "Integrations"].map(
-          (t) => (
-            <div
-              key={t}
-              onClick={() => setTab(t)}
-              style={{
-                padding: "12px 0",
-                fontSize: "14px",
-                fontWeight: 600,
-                color:
-                  tab === t ? "var(--accent-cyan)" : "var(--text-secondary)",
-                borderBottom:
-                  tab === t
-                    ? "2px solid var(--accent-cyan)"
-                    : "2px solid transparent",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-              }}
-            >
-              {t}
-            </div>
-          ),
-        )}
+        {["Profile", "Organization"].map((t) => (
+          <div
+            key={t}
+            onClick={() => setTab(t)}
+            style={{
+              padding: "12px 0",
+              fontSize: "14px",
+              fontWeight: 600,
+              color: tab === t ? "var(--accent-cyan)" : "var(--text-secondary)",
+              borderBottom:
+                tab === t
+                  ? "2px solid var(--accent-cyan)"
+                  : "2px solid transparent",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+            }}
+          >
+            {t}
+          </div>
+        ))}
       </div>
 
       {renderContent()}

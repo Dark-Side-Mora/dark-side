@@ -666,7 +666,6 @@ export default function SecurityPage() {
           </Card>
         </div>
       </div>
-      <p>Security dashboard content coming soon...</p>
     </div>
   );
 }
