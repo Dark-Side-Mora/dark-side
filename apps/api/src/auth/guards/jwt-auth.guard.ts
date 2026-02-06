@@ -11,7 +11,7 @@ export class JwtAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
 
-    console.log('[JwtAuthGuard] Checking authorization...');
+    // console.log('[JwtAuthGuard] Checking authorization...');
 
     const user = (request as any).user;
 
@@ -20,7 +20,7 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Missing or invalid token');
     }
 
-    console.log('[JwtAuthGuard] ✓ Authorization passed for user:', user.id);
+    // console.log('[JwtAuthGuard] ✓ Authorization passed for user:', user.id);
     return true;
   }
 }

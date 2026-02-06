@@ -1,18 +1,24 @@
 import { apiGet, apiPost } from "../api/client";
+import { useOrganizationContext } from "../organization/OrganizationContext";
 
 export const useGithubApp = () => {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
-  // Authorize GitHub App
+  // Call hooks at the top level
+  const organizationContext = useOrganizationContext();
+
+  // Authorize GitHub App and create tracking record
   const authorizeGithubApp = async (redirectUri: string) => {
+    const orgId = organizationContext.currentOrgId;
+    if (!orgId) {
+      throw new Error(
+        "No organization available. Please create or select an organization first.",
+      );
+    }
     return apiPost(`${API_URL}/integrations/github-app/authorize`, {
       redirectUri,
+      organizationId: orgId,
     });
-  };
-
-  // Check if GitHub App is authorized
-  const checkGithubAppAuthorized = async () => {
-    return apiGet(`${API_URL}/integrations/github-app/installations`);
   };
 
   // Fetch installations
@@ -22,28 +28,37 @@ export const useGithubApp = () => {
     );
   };
 
-  // Sync installation
-  // const syncInstallation = async (installationId: string) => {
-  //     return apiPost(`${API_URL}/integrations/github-app/installations/${installationId}/sync`, {});
-  // };
-
   // Get GitHub App installation URL
   const installGithubApp = async (redirectUri: string) => {
+    const orgId = organizationContext.currentOrgId;
+    if (!orgId) {
+      throw new Error(
+        "No organization available. Please create or select an organization first.",
+      );
+    }
     return apiPost(`${API_URL}/integrations/github-app/install`, {
       redirectUri,
+      organizationId: orgId,
     });
   };
 
-  // Sync installations from GitHub
-  const syncInstallations = async () => {
-    return apiPost(`${API_URL}/integrations/github-app/sync`, {});
+  // Sync repositories for a specific organization
+  const syncRepositoriesForOrganization = async (organizationId?: string) => {
+    const orgId = organizationId || organizationContext.organizations?.[0]?.id;
+    if (!orgId) {
+      throw new Error("No organization selected");
+    }
+
+    return apiPost(
+      `${API_URL}/integrations/github-app/organizations/${orgId}/sync-repos`,
+      {},
+    );
   };
 
   return {
     authorizeGithubApp,
-    checkGithubAppAuthorized,
     fetchInstallations,
     installGithubApp,
-    syncInstallations,
+    syncRepositoriesForOrganization,
   };
 };

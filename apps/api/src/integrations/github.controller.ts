@@ -143,11 +143,10 @@ export class GithubController {
    * GET /integrations/github/connections
    * Get user's GitHub connections and organizations
    */
+  @UseGuards(JwtAuthGuard)
   @Get('connections')
-  async getConnections(@Query('userId') userId: string) {
-    if (!userId) {
-      throw new BadRequestException('userId query parameter is required');
-    }
+  async getConnections(@Req() req) {
+    const userId = req.user.id;
 
     const connection = await this.githubService.getUserConnections(userId);
 
@@ -182,14 +181,13 @@ export class GithubController {
    * GET /integrations/github/organizations/:orgName/repositories
    * Fetch all repositories for an organization (for frontend to display)
    */
+  @UseGuards(JwtAuthGuard)
   @Get('organizations/:orgName/repositories')
   async getOrganizationRepositories(
-    @Query('userId') userId: string,
+    @Req() req,
     @Query('orgName') orgName: string,
   ) {
-    if (!userId) {
-      throw new BadRequestException('userId query parameter is required');
-    }
+    const userId = req.user.id;
 
     // Get access token
     const accessToken = await this.githubService.getAccessToken(userId);

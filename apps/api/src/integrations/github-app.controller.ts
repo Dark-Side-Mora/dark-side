@@ -28,18 +28,36 @@ export class GithubAppController {
 
   /**
    * POST /integrations/github-app/authorize
-   * Generate GitHub App OAuth authorization URL
+   * Generate GitHub App OAuth authorization URL and track the connection attempt
    */
   @UseGuards(JwtAuthGuard)
   @Post('authorize')
   async initiateAuthorization(
     @Req() req,
-    @Body() body: { redirectUri?: string },
+    @Body() body: { redirectUri?: string; organizationId?: string },
   ) {
-    const { redirectUri } = body;
+    const { redirectUri, organizationId } = body;
+    const userId = req.user.id;
+
+    console.log(
+      `[GithubAppController] Initiating GitHub App authorization for user ${userId}, org: ${organizationId}`,
+    );
+
+    if (!organizationId) {
+      throw new BadRequestException(
+        'organizationId is required to track GitHub connection',
+      );
+    }
+
+    // Create tracking record
+    await this.githubAppService.createPendingConnection(userId, organizationId);
+
+    console.log(
+      `[GithubAppController] Created pending connection for user ${userId} and organization ${organizationId}`,
+    );
 
     const authUrl = this.githubAppService.generateAuthorizationUrl(
-      req.user.id,
+      userId,
       redirectUri,
     );
 
@@ -58,11 +76,24 @@ export class GithubAppController {
    */
   @UseGuards(JwtAuthGuard)
   @Post('install')
-  async initiateInstall(@Req() req, @Body() body: { redirectUri?: string }) {
-    const { redirectUri } = body;
+  async initiateInstall(
+    @Req() req,
+    @Body() body: { redirectUri?: string; organizationId?: string },
+  ) {
+    const { redirectUri, organizationId } = body;
+    const userId = req.user.id;
+
+    if (!organizationId) {
+      throw new BadRequestException(
+        'organizationId is required to track GitHub installation',
+      );
+    }
+
+    // Create tracking record
+    await this.githubAppService.createPendingConnection(userId, organizationId);
 
     const installUrl = this.githubAppService.generateInstallationUrl(
-      req.user.id,
+      userId,
       redirectUri,
     );
 
@@ -136,9 +167,7 @@ export class GithubAppController {
           state,
         );
 
-        return res.redirect(
-          `${result.redirectUri}?status=success&installations=${result.installations.length}`,
-        );
+        return res.redirect(`${redirectUri}?status=success`);
       }
 
       // Missing required parameters
@@ -197,23 +226,35 @@ export class GithubAppController {
   }
 
   /**
-   * POST /integrations/github-app/sync
-   * Sync all installations from GitHub
+   * POST /integrations/github-app/organizations/:organizationId/sync-repos
+   * Sync repositories for a specific organization
+   * Called when user visits an organization after connecting GitHub
    */
   @UseGuards(JwtAuthGuard)
-  @Post('sync')
-  async syncAllInstallations(@Req() req) {
+  @Post('organizations/:organizationId/sync-repos')
+  async syncRepositoriesForOrganization(
+    @Req() req,
+    @Param('organizationId') organizationId: string,
+  ) {
     try {
-      // Re-fetch all installations from GitHub
-      await this.githubAppService.getUserInstallations(req.user.id, true);
+      if (!organizationId) {
+        throw new BadRequestException('organizationId is required');
+      }
+
+      const result =
+        await this.githubAppService.syncRepositoriesForOrganization(
+          req.user.id,
+          organizationId,
+        );
 
       return {
         statusCode: HttpStatus.OK,
-        message: 'Installations synced successfully',
+        message: 'Repositories synced successfully',
+        data: result,
       };
     } catch (error) {
       throw new InternalServerErrorException(
-        `Failed to sync installations: ${error.message}`,
+        `Failed to sync repositories: ${error.message}`,
       );
     }
   }
@@ -221,26 +262,28 @@ export class GithubAppController {
   /**
    * POST /integrations/github-app/installations/:installationId/sync
    * Sync specific installation repositories from GitHub
+   * NOTE: This endpoint is deprecated. Syncing is now handled automatically
+   * by the organization service when fetching projects.
    */
-  @UseGuards(JwtAuthGuard)
-  @Post('installations/:installationId/sync')
-  async syncInstallation(
-    @Req() req,
-    @Param('installationId') installationId: string,
-  ) {
-    if (!installationId) {
-      throw new BadRequestException('installationId is required');
-    }
+  // @UseGuards(JwtAuthGuard)
+  // @Post('installations/:installationId/sync')
+  // async syncInstallation(
+  //   @Req() req,
+  //   @Param('installationId') installationId: string,
+  // ) {
+  //   if (!installationId) {
+  //     throw new BadRequestException('installationId is required');
+  //   }
 
-    const result =
-      await this.githubAppService.syncInstallationRepositories(installationId);
+  //   const result =
+  //     await this.githubAppService.syncInstallationRepositories(installationId);
 
-    return {
-      statusCode: HttpStatus.OK,
-      message: 'Installation synced successfully',
-      data: result,
-    };
-  }
+  //   return {
+  //     statusCode: HttpStatus.OK,
+  //     message: 'Installation synced successfully',
+  //     data: result,
+  //   };
+  // }
 
   /**
    * POST /integrations/github-app/webhook

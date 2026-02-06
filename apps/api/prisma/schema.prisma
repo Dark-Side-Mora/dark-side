@@ -4,26 +4,26 @@
 
 model CourseModule {
   id        Int      @id @default(autoincrement())
-  title     String
-  status    String   // 'Completed', 'In Progress', 'Not Started'
-  length    String   // e.g. '15 mins'
-  icon      String   // e.g. '🎯'
-  order     Int      // For ordering modules in UI
+  title     S  status    String // 'Completed', 'In Progress', 'Not Started'
+  length    String // e.g. '15 mins'
+  icon      String // e.g. '🎯'
+  order     Int // For ordering modules in UI
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  quizzes   Quiz[]
+  quizzes Quiz[]
 
   @@unique([title])
   @@index([order])
 }
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -36,34 +36,35 @@ model User {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  organizationMemberships OrganizationMembership[]
-  membershipRequests MembershipRequest[]
-  githubInstallations GitHubInstallationUser[]
+  organizationMemberships  OrganizationMembership[]
+  membershipRequests       MembershipRequest[]
+  githubInstallations      GitHubInstallationUser[]
+  githubConnectionsPending GitHubAppConnectionPending[]
 }
 
 model Project {
-  id            String     @id @default(uuid())
-  name          String
-  provider      String     // 'github', 'gitlab', etc.
-  repositoryUrl String
-  pipelines     Pipeline[]
-  userId        String     // Supabase Auth User ID
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  id                 String             @id @default(uuid())
+  name               String
+  provider           String // 'github', 'gitlab', etc.
+  repositoryUrl      String
+  pipelines          Pipeline[]
+  userId             String // Supabase Auth User ID
+  organizationId     String
+  organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   githubRepositories GitHubRepository[] // If provider is 'github', link to GitHubRepository
   // For future: gitlabRepositories GitLabRepository[]
-  createdAt     DateTime   @default(now())
+  createdAt          DateTime           @default(now())
 }
 
 model Pipeline {
   id               String            @id @default(uuid())
   projectId        String
   project          Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  externalId       String            // CI Provider's ID
+  externalId       String // CI Provider's ID
   status           String
   branch           String?
   commitSha        String?
-  eventType        String?           // push, pull_request
+  eventType        String? // push, pull_request
   startedAt        DateTime?
   finishedAt       DateTime?
   workflowContent  String?           @db.Text
@@ -87,7 +88,7 @@ model SecurityFinding {
   id          String   @id @default(uuid())
   pipelineId  String
   pipeline    Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
-  severity    String   
+  severity    String
   type        String
   description String?
   remediation String?
@@ -95,18 +96,18 @@ model SecurityFinding {
 }
 
 model IntegrationConnection {
-  id                String                @id @default(uuid())
-  userId            String                // Supabase Auth User ID
-  organizationId    String?               // Optional: Link to a specific workspace
-  provider          String                // 'github', 'jenkins', etc.
-  accessToken       String                // Encrypted token
-  refreshToken      String?               // Optional refresh token
-  expiresAt         DateTime?
-  metadata          Json?                 // Provider-specific metadata
-  status            String                @default("active") // active, expired, revoked
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
-  organizationAccess OrganizationAccess[]
+  id                  String               @id @default(uuid())
+  userId              String // Supabase Auth User ID
+  organizationId      String? // Optional: Link to a specific workspace
+  provider            String // 'github', 'jenkins', etc.
+  accessToken         String // Encrypted token
+  refreshToken        String? // Optional refresh token
+  expiresAt           DateTime?
+  metadata            Json? // Provider-specific metadata
+  status              String               @default("active") // active, expired, revoked
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  organizationAccess  OrganizationAccess[]
   githubInstallations GitHubInstallation[]
 
   @@unique([userId, provider, organizationId])
@@ -114,49 +115,49 @@ model IntegrationConnection {
 }
 
 model OrganizationAccess {
-  id                     String               @id @default(uuid())
-  connectionId           String
-  connection             IntegrationConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  organizationId         String               // GitHub org ID
-  organizationName       String               // GitHub org name/login
-  repositoryPermissions  Json                 // Array of allowed repos: [{id, name, fullName}]
-  lastSyncedAt           DateTime             @default(now())
-  createdAt              DateTime             @default(now())
-  updatedAt              DateTime             @updatedAt
+  id                    String                @id @default(uuid())
+  connectionId          String
+  connection            IntegrationConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  organizationId        String // GitHub org ID
+  organizationName      String // GitHub org name/login
+  repositoryPermissions Json // Array of allowed repos: [{id, name, fullName}]
+  lastSyncedAt          DateTime              @default(now())
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
 
   @@unique([connectionId, organizationId])
   @@index([connectionId])
 }
 
 model GitHubInstallation {
-  id                  String                @id @default(uuid())
+  id                  String                 @id @default(uuid())
   connectionId        String?
   connection          IntegrationConnection? @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  installationId      String                @unique // GitHub App installation ID
-  accountId           String                // GitHub account/org ID
-  accountLogin        String                // GitHub account/org login
-  accountType         String                // 'User' or 'Organization'
-  targetType          String                // 'User' or 'Organization'
-  permissions         Json                  // Installation permissions
-  repositorySelection String                // 'all' or 'selected'
+  installationId      String                 @unique // GitHub App installation ID
+  accountId           String // GitHub account/org ID
+  accountLogin        String // GitHub account/org login
+  accountType         String // 'User' or 'Organization'
+  targetType          String // 'User' or 'Organization'
+  permissions         Json // Installation permissions
+  repositorySelection String // 'all' or 'selected'
   repositories        GitHubRepository[]
-  status              String                @default("active") // active, suspended, removed
-  installedAt         DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-  
-  users               GitHubInstallationUser[]
+  status              String                 @default("active") // active, suspended, removed
+  installedAt         DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  users GitHubInstallationUser[]
 
   @@index([installationId])
   @@index([accountId])
 }
 
 model GitHubInstallationUser {
-  id               String            @id @default(uuid())
-  installationId   String
-  installation     GitHubInstallation @relation(fields: [installationId], references: [id], onDelete: Cascade)
-  userId           String            // Supabase Auth User ID
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  addedAt          DateTime          @default(now())
+  id             String             @id @default(uuid())
+  installationId String
+  installation   GitHubInstallation @relation(fields: [installationId], references: [id], onDelete: Cascade)
+  userId         String // Supabase Auth User ID
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  addedAt        DateTime           @default(now())
 
   @@unique([installationId, userId])
   @@index([userId])
@@ -168,11 +169,11 @@ model GitHubRepository {
   installation   GitHubInstallation @relation(fields: [installationId], references: [id], onDelete: Cascade)
   projectId      String?
   project        Project?           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  repositoryId   String             // GitHub repo ID
-  name           String             // Repo name
-  fullName       String             // owner/repo
+  repositoryId   String // GitHub repo ID
+  name           String // Repo name
+  fullName       String // owner/repo
   private        Boolean
-  permissions    Json?              // Specific permissions for this repo
+  permissions    Json? // Specific permissions for this repo
   addedAt        DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
@@ -183,27 +184,27 @@ model GitHubRepository {
 }
 
 model WorkflowAnalysisCache {
-  id                    String             @id @default(uuid())
-  userId                String
-  repositoryId          String
-  workflowPath          String
-  workflowName          String
-  workflowFileContent   String             @db.Text
-  latestRunLogs         String             @db.Text
-  contentHash           String
+  id                  String @id @default(uuid())
+  userId              String
+  repositoryId        String
+  workflowPath        String
+  workflowName        String
+  workflowFileContent String @db.Text
+  latestRunLogs       String @db.Text
+  contentHash         String
 
-  analysisId            String             @unique
-  aiProvider            String
-  overallRisk           String
-  summary               String             @db.Text
-  issues                Json
+  analysisId  String @unique
+  aiProvider  String
+  overallRisk String
+  summary     String @db.Text
+  issues      Json
 
-  analysisTimestamp     DateTime
-  cachedAt              DateTime           @default(now())
-  expiresAt             DateTime
+  analysisTimestamp DateTime
+  cachedAt          DateTime @default(now())
+  expiresAt         DateTime
 
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([repositoryId, contentHash])
   @@index([userId])
@@ -217,32 +218,32 @@ model WorkflowAnalysisCache {
 // ============================================
 
 model Quiz {
-  id            Int      @id @default(autoincrement())
-  name          String
-  description   String   @db.Text
-  difficulty    String   // 'beginner', 'intermediate', 'advanced'
-  courseModule  CourseModule @relation(fields: [courseModuleId], references: [id], onDelete: Cascade)
+  id             Int            @id @default(autoincrement())
+  name           String
+  description    String         @db.Text
+  difficulty     String // 'beginner', 'intermediate', 'advanced'
+  courseModule   CourseModule   @relation(fields: [courseModuleId], references: [id], onDelete: Cascade)
   courseModuleId Int
-  questions     QuizQuestion[]
+  questions      QuizQuestion[]
 }
 
 model QuizQuestion {
-  id            Int      @id @default(autoincrement())
-  quiz          Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  quizId        Int
-  type          String   // 'multiple-choice', 'workflow-fix'
-  question      String   @db.Text
-  choices       String[] // For multiple choice and workflow-fix (as options)
-  correctIndex  Int      // Index in choices array (for both types)
-  points        Int      // Points for this question
-  workflowCode  String?  @db.Text // For workflow-fix type
-  hint          String?  @db.Text
+  id           Int      @id @default(autoincrement())
+  quiz         Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  quizId       Int
+  type         String // 'multiple-choice', 'workflow-fix'
+  question     String   @db.Text
+  choices      String[] // For multiple choice and workflow-fix (as options)
+  correctIndex Int // Index in choices array (for both types)
+  points       Int // Points for this question
+  workflowCode String?  @db.Text // For workflow-fix type
+  hint         String?  @db.Text
 
-  userProgress  UserQuizProgress[]
+  userProgress UserQuizProgress[]
 }
 
 model UserQuizProgress {
-  id         Int    @id @default(autoincrement())
+  id         Int          @id @default(autoincrement())
   userId     String // Supabase Auth User ID
   question   QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
   questionId Int
@@ -255,27 +256,27 @@ model UserQuizProgress {
 // ============================================
 
 model Organization {
-  id        String   @id @default(uuid())
+  id        String                   @id @default(uuid())
   name      String
-  provider  String   @default("github") // 'github', 'jenkins', etc.
+  provider  String                   @default("github") // 'github', 'jenkins', etc.
   domain    String
   members   OrganizationMembership[]
   requests  MembershipRequest[]
   projects  Project[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
 
   @@index([domain])
 }
 
 model OrganizationMembership {
-  id             String   @id @default(uuid())
+  id             String       @id @default(uuid())
   organizationId String
   userId         String
-  role           String   // 'owner', 'admin', 'member'
+  role           String // 'owner', 'admin', 'member'
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt      DateTime @default(now())
+  createdAt      DateTime     @default(now())
 
   @@unique([organizationId, userId])
   @@index([organizationId])
@@ -287,23 +288,23 @@ model OrganizationMembership {
 // ============================================
 
 model DashboardMetricsCache {
-  id                      String   @id @default(uuid())
-  userId                  String
-  
+  id     String @id @default(uuid())
+  userId String
+
   // Metric values
-  totalProjects           Int
-  activeAlerts            Int
-  buildVolume             Int
+  totalProjects            Int
+  activeAlerts             Int
+  buildVolume              Int
   pipelineHealthPercentage Int
-  
+
   // JSON stored data
   recentActivity          Json
   reliabilityTrend        Json
   optimizationSuggestions Json
   resourceConsumption     Json
-  
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([userId])
   @@index([userId])
@@ -311,16 +312,29 @@ model DashboardMetricsCache {
 }
 
 model MembershipRequest {
-  id             String   @id @default(uuid())
+  id             String       @id @default(uuid())
   organizationId String
   userId         String
-  status         String   // 'Comming Soon', 'Available', 'Paused'
+  status         String // 'Comming Soon', 'Available', 'Paused'
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   @@unique([organizationId, userId])
   @@index([organizationId])
   @@index([userId])
+}
+
+model GitHubAppConnectionPending {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String // Stored as string, no FK constraint since org may not exist yet
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime // Expires after 1 hour
+
+  @@unique([userId, organizationId])
+  @@index([userId])
+  @@index([organizationId])
 }
