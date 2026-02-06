@@ -4,13 +4,13 @@ import { DashboardMetricsDto } from './dto/dashboard-metrics.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
 @Controller('dashboard')
-@UseGuards(JwtAuthGuard)
 export class DashboardController {
   private readonly logger = new Logger(DashboardController.name);
 
   constructor(private readonly dashboardService: DashboardService) {}
 
   @Get('metrics')
+  @UseGuards(JwtAuthGuard)
   async getDashboardMetrics(
     @Req() req: any,
     @Query('refresh') refresh?: string,
@@ -25,5 +25,10 @@ export class DashboardController {
 
     this.logger.log(`Getting dashboard metrics for user: ${userId}`);
     return this.dashboardService.getDashboardMetrics(userId);
+  }
+
+  @Get('health')
+  async healthCheck(): Promise<{ status: string }> {
+    return { status: 'ok' };
   }
 }
