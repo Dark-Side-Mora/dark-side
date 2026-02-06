@@ -78,6 +78,26 @@ export function useMetrics() {
     }
   }, []);
 
+  const refreshMetrics = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await apiGet<DashboardMetrics>(
+        `${API_URL}/dashboard/metrics?refresh=true`,
+      );
+      setMetrics(data);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to refresh dashboard metrics",
+      );
+      console.error("Error refreshing dashboard metrics:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Auto-fetch on mount
   useEffect(() => {
     fetchMetrics();
@@ -88,5 +108,6 @@ export function useMetrics() {
     loading,
     error,
     refetch: fetchMetrics,
+    refreshMetrics,
   };
 }

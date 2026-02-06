@@ -101,9 +101,7 @@ export class DashboardService {
     return metrics;
   }
 
-  private async fetchFreshMetrics(
-    userId: string,
-  ): Promise<DashboardMetricsDto> {
+  public async fetchFreshMetrics(userId: string): Promise<DashboardMetricsDto> {
     // Get user's organizations with projects
     const organizations = await this.prisma.organization.findMany({
       where: {

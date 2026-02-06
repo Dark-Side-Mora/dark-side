@@ -100,7 +100,7 @@ const EmptyChart = ({ message }: { message: string }) => (
 );
 
 export default function Dashboard() {
-  const { metrics, loading, error } = useMetrics();
+  const { metrics, loading, error, refreshMetrics } = useMetrics();
 
   if (loading) {
     return (
@@ -160,9 +160,68 @@ export default function Dashboard() {
     <>
       {/* Header */}
       <div style={{ marginBottom: "32px" }}>
-        <h2 style={{ fontSize: "32px", fontWeight: 800, marginBottom: "4px" }}>
-          System Overview
-        </h2>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: "8px",
+          }}
+        >
+          <h2 style={{ fontSize: "32px", fontWeight: 800 }}>System Overview</h2>
+          <button
+            onClick={refreshMetrics}
+            disabled={loading}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "8px 16px",
+              borderRadius: "8px",
+              border: "1px solid var(--border)",
+              backgroundColor: "var(--bg-card)",
+              color: "var(--text-primary)",
+              cursor: loading ? "not-allowed" : "pointer",
+              fontSize: "13px",
+              fontWeight: 600,
+              transition: "all 0.2s ease",
+              opacity: loading ? 0.6 : 1,
+            }}
+            onMouseEnter={(e) => {
+              if (!loading) {
+                e.currentTarget.style.backgroundColor =
+                  "rgba(6, 182, 212, 0.1)";
+                e.currentTarget.style.borderColor = "var(--accent-cyan)";
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "var(--bg-card)";
+              e.currentTarget.style.borderColor = "var(--border)";
+            }}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              style={{
+                animation: loading ? "spin 1s linear infinite" : "none",
+              }}
+            >
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2-8.83"></path>
+            </svg>
+            {loading ? "Syncing..." : "Sync"}
+          </button>
+        </div>
+        <style>{`
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
         <p
           style={{
             color: "var(--text-secondary)",
