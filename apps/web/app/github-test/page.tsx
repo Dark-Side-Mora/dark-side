@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import styles from "./github-test.module.css";
+import { useGithubApp } from "@/lib/project/useGithubApp";
 
 const API_URL = "http://localhost:3000";
 
@@ -23,6 +24,7 @@ export default function GitHubTestPage() {
   const [userId, setUserId] = useState("test-user-123");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const { authorizeGithubApp } = useGithubApp();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [selectedOrg, setSelectedOrg] = useState("");
@@ -49,22 +51,15 @@ export default function GitHubTestPage() {
     setMessage("");
 
     try {
-      const response = await fetch(`${API_URL}/integrations/github/authorize`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          userId,
-          redirectUri: window.location.origin + "/github-test",
-        }),
-      });
-
-      const data = await response.json();
+      const data = (await authorizeGithubApp(
+        `${window.location.origin}/github-test`,
+      )) as any;
 
       if (data.data?.authorizationUrl) {
         // Redirect to GitHub OAuth
         window.location.href = data.data.authorizationUrl;
+      } else {
+        setMessage("Error: No authorization URL returned");
       }
     } catch (error) {
       setMessage("Error: " + (error as Error).message);

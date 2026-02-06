@@ -168,9 +168,11 @@ export class OrganizationController {
   }
 
   // Get all projects under an organization, including repo details
+  // This will automatically sync GitHub repositories before fetching projects
   @Get(':id/projects')
   async getProjects(@Req() req, @Param('id') id: string) {
-    const result = await this.orgService.getProjectsWithRepo(id);
+    const userId = req.user?.id;
+    const result = await this.orgService.getProjectsWithRepo(id, userId);
     console.log(
       '[OrganizationController] ✓ Organization projects fetched:',
       result,

@@ -20,8 +20,12 @@ export default function ProjectsPage() {
   } = useOrganization();
   const { fetchProjects, loading: projectLoading, projects } = useProject();
 
-  const { installGithubApp, syncInstallations, authorizeGithubApp } =
-    useGithubApp();
+  const {
+    installGithubApp,
+    authorizeGithubApp,
+    fetchInstallations,
+    syncRepositoriesForOrganization,
+  } = useGithubApp();
   const [githubLoading, setGithubLoading] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
   const [isTokenExpired, setIsTokenExpired] = useState(false);
@@ -45,8 +49,16 @@ export default function ProjectsPage() {
 
       const refreshData = async () => {
         const orgs = await fetchOrganizations();
-        // If we have a current org, or if one was just auto-selected by the provider, refresh projects
+        // If we have a current org, sync repositories from GitHub
         if (currentOrgId) {
+          try {
+            console.log(
+              "[ProjectsPage] Syncing repositories for current organization...",
+            );
+            await syncRepositoriesForOrganization(currentOrgId);
+          } catch (err) {
+            console.error("[ProjectsPage] Failed to sync repositories:", err);
+          }
           await fetchProjects(currentOrgId);
         }
       };
@@ -56,7 +68,8 @@ export default function ProjectsPage() {
       // Remove query params from URL without refreshing
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, [fetchOrganizations, fetchProjects, currentOrgId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleConnectClick = () => {
     router.push("/integrations");
@@ -78,17 +91,27 @@ export default function ProjectsPage() {
     }
   };
 
-  // Background Sync logic
+  // Background Sync logic - use diff-based sync for each installation
   const performBackgroundSync = async (silent = true) => {
     try {
       if (!silent) setSyncLoading(true);
 
-      await syncInstallations();
-      console.log("[ProjectsPage] Sync completed, refreshing data...");
+      // Get all installations
+      const installationsRes = (await fetchInstallations(true)) as any;
+      const installations = installationsRes.data || [];
+
+      console.log(
+        `[ProjectsPage] Found ${installations.length} installations to sync`,
+      );
+
+      console.log(
+        "[ProjectsPage] All installations synced, refreshing data...",
+      );
 
       // Refresh organizations and projects
       await fetchOrganizations();
       if (currentOrgId) {
+        await syncRepositoriesForOrganization(currentOrgId);
         await fetchProjects(currentOrgId);
       }
 
@@ -137,24 +160,26 @@ export default function ProjectsPage() {
       );
       fetchProjects(currentOrgId);
     }
-  }, [isMounted, currentOrgId, fetchProjects]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMounted, currentOrgId]);
 
   // 2. Background Sync (Initial mount & Window Focus)
   useEffect(() => {
     if (!isMounted) return;
 
-    // Initial background sync
-    performBackgroundSync(true);
+    // // Initial background sync
+    // performBackgroundSync(true);
 
-    const handleFocus = () => {
-      console.log(
-        "[ProjectsPage] Window focused, triggering background sync...",
-      );
-      performBackgroundSync(true);
-    };
+    // const handleFocus = () => {
+    //   console.log(
+    //     "[ProjectsPage] Window focused, triggering background sync...",
+    //   );
+    //   performBackgroundSync(true);
+    // };
 
-    window.addEventListener("focus", handleFocus);
-    return () => window.removeEventListener("focus", handleFocus);
+    // window.addEventListener("focus", handleFocus);
+    // return () => window.removeEventListener("focus", handleFocus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMounted]); // Removed currentOrgId from here to prevent redundant heavy syncs
 
   return (

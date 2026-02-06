@@ -4,8 +4,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { GithubAppService } from '../integrations/github-app.service';
 import { Prisma } from '@prisma/client';
 import { CreateOrganizationDto } from './dto/organization.dto';
+import { JenkinsService } from 'src/integrations/jenkins.service';
 
 @Injectable()
 export class OrganizationService {
@@ -70,8 +72,33 @@ export class OrganizationService {
     return project;
   }
   // Fetch all projects under an organization, including actual repo details
-  async getProjectsWithRepo(orgId: string) {
-    // Get projects for the organization
+  // First syncs repositories from GitHub to ensure data is up-to-date
+  async getProjectsWithRepo(orgId: string, userId: string) {
+    // Sync repositories from GitHub first to ensure we have the latest data
+    try {
+      console.log(
+        `[OrganizationService] Syncing repositories for org ${orgId} and user ${userId}`,
+      );
+      await this.githubAppService.syncRepositoriesForOrganization(
+        userId,
+        orgId,
+      );
+      // await this.jenkinsService.syncJenkinsProjectsForOrganization(
+      //   userId,
+      //   orgId,
+      // );
+      console.log(
+        `[OrganizationService] Successfully synced repositories for org ${orgId}`,
+      );
+    } catch (error) {
+      console.error(
+        `[OrganizationService] Error syncing repositories for org ${orgId}:`,
+        error.message,
+      );
+      // Continue to fetch projects even if sync fails
+    }
+
+    // Fetch projects from database
     const projects = await this.prisma.project.findMany({
       where: { organizationId: orgId },
       include: {
@@ -81,7 +108,11 @@ export class OrganizationService {
     });
     return projects;
   }
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private githubAppService: GithubAppService,
+    private jenkinsService: JenkinsService,
+  ) {}
 
   async getOrganizationsForUser(userId: string) {
     // Return organizations the user is a member of, with role
