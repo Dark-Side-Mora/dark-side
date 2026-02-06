@@ -60,34 +60,44 @@ export class DashboardService {
     // Fetch fresh data
     const metrics = await this.fetchFreshMetrics(userId);
 
-    // Save to cache
-    await this.prisma.dashboardMetricsCache.upsert({
-      where: { userId },
-      create: {
-        userId,
-        totalProjects: metrics.totalProjects,
-        activeAlerts: metrics.activeAlerts,
-        buildVolume: metrics.buildVolume,
-        pipelineHealthPercentage: metrics.pipelineHealthPercentage,
-        recentActivity: metrics.recentActivity as any,
-        reliabilityTrend: metrics.reliabilityTrend as any,
-        optimizationSuggestions: metrics.optimizationSuggestions as any,
-        resourceConsumption: metrics.resourceConsumption as any,
-      },
-      update: {
-        totalProjects: metrics.totalProjects,
-        activeAlerts: metrics.activeAlerts,
-        buildVolume: metrics.buildVolume,
-        pipelineHealthPercentage: metrics.pipelineHealthPercentage,
-        recentActivity: metrics.recentActivity as any,
-        reliabilityTrend: metrics.reliabilityTrend as any,
-        optimizationSuggestions: metrics.optimizationSuggestions as any,
-        resourceConsumption: metrics.resourceConsumption as any,
-        updatedAt: now,
-      },
-    });
+    // Check if there's any actual data (projects with pipeline runs)
+    const hasData = metrics.buildVolume > 0 || metrics.totalProjects > 0;
 
-    this.logger.log('Metrics cached successfully');
+    // Only save to cache if there's actual data
+    if (hasData) {
+      await this.prisma.dashboardMetricsCache.upsert({
+        where: { userId },
+        create: {
+          userId,
+          totalProjects: metrics.totalProjects,
+          activeAlerts: metrics.activeAlerts,
+          buildVolume: metrics.buildVolume,
+          pipelineHealthPercentage: metrics.pipelineHealthPercentage,
+          recentActivity: metrics.recentActivity as any,
+          reliabilityTrend: metrics.reliabilityTrend as any,
+          optimizationSuggestions: metrics.optimizationSuggestions as any,
+          resourceConsumption: metrics.resourceConsumption as any,
+        },
+        update: {
+          totalProjects: metrics.totalProjects,
+          activeAlerts: metrics.activeAlerts,
+          buildVolume: metrics.buildVolume,
+          pipelineHealthPercentage: metrics.pipelineHealthPercentage,
+          recentActivity: metrics.recentActivity as any,
+          reliabilityTrend: metrics.reliabilityTrend as any,
+          optimizationSuggestions: metrics.optimizationSuggestions as any,
+          resourceConsumption: metrics.resourceConsumption as any,
+          updatedAt: new Date(),
+        },
+      });
+
+      this.logger.log('Metrics cached successfully');
+    } else {
+      this.logger.log(
+        'No data available - returning zero metrics without caching',
+      );
+    }
+
     return metrics;
   }
 
