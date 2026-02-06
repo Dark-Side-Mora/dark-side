@@ -5,12 +5,13 @@
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**"]
+      "outputs": [".next/**", "!.next/cache/**"],
+      "env": ["EMAIL_CONFIRMATION_ENABLED"]
     },
     "lint": {
       "dependsOn": ["^lint"]
     },
-     "lint:fix": {
+    "lint:fix": {
       "dependsOn": ["^lint:fix"]
     },
     "check-types": {

@@ -111,11 +111,11 @@ export const useAuth = () => {
       });
 
       if (error) throw error;
-      console.log("OAuth sign-in data pppppppppppppp:", data);
+      console.log("[Auth] Google OAuth initiated, redirecting to provider");
       return { data, error: null };
     } catch (err) {
       const authError = err as AuthError;
-      console.log("OAuth sign-in error:", authError);
+      console.error("[Auth] Google OAuth error:", authError);
       setError(authError);
       return { data: null, error: authError };
     } finally {
@@ -129,6 +129,7 @@ export const useAuth = () => {
     setError(null);
 
     try {
+      console.log("[Auth] Initiating GitHub OAuth sign-in");
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "github",
         options: {
@@ -137,10 +138,11 @@ export const useAuth = () => {
       });
 
       if (error) throw error;
-      console.log("OAuth sign-in data:", data);
+      console.log("[Auth] GitHub OAuth initiated, redirecting to provider");
       return { data, error: null };
     } catch (err) {
       const authError = err as AuthError;
+      console.error("[Auth] GitHub OAuth error:", authError);
       setError(authError);
       return { data: null, error: authError };
     } finally {
