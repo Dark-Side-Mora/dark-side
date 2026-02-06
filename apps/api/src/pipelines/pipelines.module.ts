@@ -25,6 +25,7 @@ import { PrismaService } from '../prisma/prisma.service';
   ],
   exports: [
     GithubPipelineService,
+    JenkinsPipelineService,
     PipelineAnalysisService,
     WorkflowAnalysisCacheService,
   ],

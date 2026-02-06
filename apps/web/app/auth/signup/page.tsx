@@ -8,9 +8,11 @@ import { IconSun } from "../../../components/ui/IconSun";
 import { IconMoon } from "../../../components/ui/IconMoon";
 import { LogoIcon } from "../../../components/ui/LogoIcon";
 import { useAuth } from "../../../lib/auth";
+import { useRouter } from "next/navigation";
 
 export default function SignupPage() {
-  const { signUp, signInWithGoogle, loading } = useAuth();
+  const { signUp, signInWithGoogle, loading, signIn } = useAuth();
+  const router = useRouter();
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -18,6 +20,8 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
   const [emailConfirmationSent, setEmailConfirmationSent] = useState(false);
+  const emailConfirmationEnabled =
+    process.env.EMAIL_CONFIRMATION_ENABLED === "true";
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme");
@@ -52,8 +56,21 @@ export default function SignupPage() {
     if (error) {
       setAuthError(error.message);
     } else if (data) {
-      console.log("Signup successful - confirmation email sent to:", email);
-      setEmailConfirmationSent(true);
+      if (emailConfirmationEnabled) {
+        console.log("Signup successful - confirmation email sent to:", email);
+        setEmailConfirmationSent(true);
+      } else {
+        console.log("Signup successful - no email confirmation required");
+        const { data, error } = await signIn({ email, password });
+
+        if (error) {
+          setAuthError(error.message);
+        } else if (data?.session) {
+          // Session created successfully, redirect immediately
+          console.log("[Login] Sign in successful, redirecting to dashboard");
+          router.push("/");
+        }
+      }
     }
   };
 

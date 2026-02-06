@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { GithubPipelineService } from '../pipelines/github/github-pipeline.service';
+import { JenkinsPipelineService } from '../pipelines/jenkins-pipeline.service';
 import { GeminiSecurityService } from '../ai/gemini/gemini-security.service';
 import {
   DashboardMetricsDto,
@@ -18,6 +19,7 @@ export class DashboardService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly githubPipelineService: GithubPipelineService,
+    private readonly jenkinsPipelineService: JenkinsPipelineService,
     private readonly geminiService: GeminiSecurityService,
   ) {}
 
@@ -112,10 +114,11 @@ export class DashboardService {
 
     this.logger.log(`Found ${organizations.length} organizations for user`);
 
-    // Fetch real pipeline data from GitHub for each project
+    // Fetch real pipeline data from all providers for each project
     const projectsWithPipelines = await Promise.all(
       organizations.flatMap((org) =>
         (org.projects || []).map(async (project) => {
+          // GitHub provider
           if (
             project.provider === 'github' &&
             project.githubRepositories?.length > 0
@@ -123,7 +126,9 @@ export class DashboardService {
             try {
               const repo = project.githubRepositories[0];
               const repoIdentifier = repo.fullName;
-              this.logger.log(`Fetching pipeline data for ${repoIdentifier}`);
+              this.logger.log(
+                `Fetching GitHub pipeline data for ${repoIdentifier}`,
+              );
 
               const pipelineData =
                 await this.githubPipelineService.fetchAllPipelineData(
@@ -152,7 +157,47 @@ export class DashboardService {
               };
             } catch (error) {
               this.logger.error(
-                `Failed to fetch pipeline data for project ${project.name}: ${error.message}`,
+                `Failed to fetch GitHub pipeline data for project ${project.name}: ${error.message}`,
+              );
+              return null;
+            }
+          }
+          // Jenkins provider
+          else if (project.provider === 'jenkins') {
+            try {
+              const repoIdentifier = project.repositoryUrl || project.id;
+              this.logger.log(
+                `Fetching Jenkins pipeline data for ${project.name} (${repoIdentifier})`,
+              );
+
+              const pipelineData =
+                await this.jenkinsPipelineService.fetchAllPipelineData(
+                  userId,
+                  repoIdentifier,
+                );
+
+              // Debug: Log the structure of pipeline data
+              this.logger.log(
+                `Pipeline data for ${project.name}: ${JSON.stringify({
+                  hasWorkflows: !!pipelineData?.workflows,
+                  workflowCount: pipelineData?.workflows?.length || 0,
+                  sampleWorkflow: pipelineData?.workflows?.[0]
+                    ? {
+                        name: pipelineData.workflows[0].name,
+                        recentRunsCount:
+                          pipelineData.workflows[0].recentRuns?.length || 0,
+                      }
+                    : null,
+                })}`,
+              );
+
+              return {
+                project,
+                pipelineData,
+              };
+            } catch (error) {
+              this.logger.error(
+                `Failed to fetch Jenkins pipeline data for project ${project.name}: ${error.message}`,
               );
               return null;
             }
