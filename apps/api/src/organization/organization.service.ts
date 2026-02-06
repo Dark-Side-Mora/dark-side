@@ -74,28 +74,48 @@ export class OrganizationService {
   // Fetch all projects under an organization, including actual repo details
   // First syncs repositories from GitHub to ensure data is up-to-date
   async getProjectsWithRepo(orgId: string, userId: string) {
-    // Sync repositories from GitHub first to ensure we have the latest data
-    try {
-      console.log(
-        `[OrganizationService] Syncing repositories for org ${orgId} and user ${userId}`,
-      );
-      await this.githubAppService.syncRepositoriesForOrganization(
-        userId,
-        orgId,
-      );
-      // await this.jenkinsService.syncJenkinsProjectsForOrganization(
-      //   userId,
-      //   orgId,
-      // );
-      console.log(
-        `[OrganizationService] Successfully synced repositories for org ${orgId}`,
-      );
-    } catch (error) {
-      console.error(
-        `[OrganizationService] Error syncing repositories for org ${orgId}:`,
-        error.message,
-      );
-      // Continue to fetch projects even if sync fails
+    // Get organization details
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: orgId },
+    });
+
+    if (!organization) {
+      throw new NotFoundException('Organization not found');
+    }
+
+    // Sync with GitHub if it's a GitHub-based organization
+    if (organization.provider === 'github') {
+      try {
+        // Find the GitHub installation for this organization
+        const installation = await (
+          this.prisma.gitHubInstallation as any
+        ).findFirst({
+          where: {
+            accountLogin: organization.name.replace(' (Personal)', ''),
+            users: {
+              some: { userId },
+            },
+          },
+        });
+
+        if (installation) {
+          console.log(
+            `[OrganizationService] Syncing repositories for GitHub organization: ${organization.name}`,
+          );
+          await this.githubAppService.syncInstallationRepositories(
+            installation.id,
+          );
+        } else {
+          console.warn(
+            `[OrganizationService] No GitHub installation found for organization: ${organization.name}`,
+          );
+        }
+      } catch (error) {
+        console.error(
+          `[OrganizationService] Failed to sync GitHub repositories: ${error.message}`,
+        );
+        // Continue to fetch projects even if sync fails
+      }
     }
 
     // Fetch projects from database
