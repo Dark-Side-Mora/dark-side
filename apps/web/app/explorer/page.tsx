@@ -12,6 +12,9 @@ import type { WorkflowRun } from "@/lib/project/usePipeline";
 const NODE_WIDTH = 240;
 const NODE_HEIGHT = 120;
 
+const STEP_NODE_WIDTH = 220;
+const STEP_NODE_HEIGHT = 90;
+
 const PipelineNode = ({ name, status, duration, meta, top, left }: any) => {
   const isHealthy = status === "success";
   const isFailed = status === "failed";
@@ -109,15 +112,98 @@ const PipelineNode = ({ name, status, duration, meta, top, left }: any) => {
   );
 };
 
-// --- Parse jobs and dependencies from workflow YAML ---
-// --- Improved: Parse only actual jobs, ignore reserved/step keys ---
+// --- Step Node Component (smaller than job nodes) ---
+const StepNode = ({ name, status, meta, top, left }: any) => {
+  const isPending = status === "pending";
+  const isHealthy = status === "success";
+  const isFailed = status === "failed";
+  const isRunning = status === "running";
+
+  const color = isHealthy
+    ? "var(--success)"
+    : isFailed
+      ? "var(--error)"
+      : isRunning
+        ? "var(--accent-cyan)"
+        : "#999";
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: `${left}px`,
+        top: `${top}px`,
+        width: `${STEP_NODE_WIDTH}px`,
+        height: `${STEP_NODE_HEIGHT}px`,
+        padding: "12px 16px",
+        borderRadius: "12px",
+        backgroundColor: "var(--bg-card)",
+        backdropFilter: "blur(10px)",
+        border: `1px solid var(--border)`,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        gap: "4px",
+        zIndex: 10,
+        opacity: isPending ? 0.5 : 1,
+        transition: "all 0.3s ease",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "6px",
+        }}
+      >
+        <div
+          style={{
+            width: "6px",
+            height: "6px",
+            borderRadius: "50%",
+            backgroundColor: color,
+          }}
+        />
+        <span
+          style={{
+            fontSize: "10px",
+            fontWeight: 700,
+            color,
+            textTransform: "uppercase",
+            letterSpacing: "0.3px",
+          }}
+        >
+          {status}
+        </span>
+      </div>
+      <div
+        style={{
+          fontSize: "12px",
+          fontWeight: 600,
+          color: "var(--text-primary)",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {name}
+      </div>
+      <div style={{ fontSize: "10px", color: "var(--text-secondary)" }}>
+        {meta}
+      </div>
+    </div>
+  );
+};
+
+// --- Parse jobs, steps and dependencies from workflow YAML ---
 function parseJobsFromYaml(yaml: string) {
   // Find jobs block
   const jobsBlockMatch = yaml.match(/jobs:\s*([\s\S]*)/);
-  if (!jobsBlockMatch) return { jobs: [], edges: [] };
+  if (!jobsBlockMatch) return { jobs: [], steps: [], edges: [] };
   const jobsBlock = jobsBlockMatch[1];
-  if (!jobsBlock) return { jobs: [], edges: [] };
-  // Reserved/step keys to ignore as jobs
+  if (!jobsBlock) return { jobs: [], steps: [], edges: [] };
+
   const reserved = new Set([
     "runs-on",
     "if",
@@ -141,25 +227,74 @@ function parseJobsFromYaml(yaml: string) {
     "node-version",
     "CI",
   ]);
-  // Find all top-level job keys (by indentation)
+
   const lines = jobsBlock.split(/\r?\n/);
   const jobs = [];
-  const jobMap: { [key: string]: { needs: string[]; name: string } } = {};
+  const allSteps = [];
+  const jobMap: {
+    [key: string]: { needs: string[]; name: string; steps: any[] };
+  } = {};
   let currentJob = null;
+  let inSteps = false;
+  let stepIndex = 0;
+
   for (let i = 0; i < lines.length; ++i) {
     let line = lines[i];
     if (typeof line === "string") {
-      line = line.replace(/#.*/, "").trimEnd(); // Remove comments
-      if (!line.trim()) continue; // skip blank lines
+      line = line.replace(/#.*/, "").trimEnd();
+      if (!line.trim()) continue;
+
       const m = line.match(/^(\s*)([a-zA-Z0-9_-]+):/);
       if (m && m[1] && m[1].length === 2 && m[2] && !reserved.has(m[2])) {
-        // 2 spaces = top-level under jobs
+        // Top-level job
         const name = m[2];
         jobs.push({ name });
-        jobMap[name] = { needs: [], name };
+        jobMap[name] = { needs: [], name, steps: [] };
         currentJob = name;
+        inSteps = false;
+        stepIndex = 0;
+      } else if (currentJob && /^\s{4}steps:/.test(line)) {
+        // Steps block for current job
+        inSteps = true;
+        stepIndex = 0;
+      } else if (currentJob && inSteps && /^\s{6}-\s/.test(line)) {
+        // Step item
+        stepIndex++;
+        const stepName = `${currentJob}-step-${stepIndex}`;
+
+        // Try to extract step name from 'name:' field or uses/run
+        let displayName = `Step ${stepIndex}`;
+
+        // Look ahead for name or uses/run
+        for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+          const line_j = lines[j];
+          if (!line_j) continue;
+          const nextLine = line_j.replace(/#.*/, "").trimEnd();
+          const nameMatch = nextLine.match(/name:\s*(.+?)(?:\s*#|$)/);
+          if (nameMatch && nameMatch[1]) {
+            displayName = nameMatch[1].trim();
+            break;
+          }
+          const usesMatch = nextLine.match(/uses:\s*(.+?)(?:\s*#|$)/);
+          if (usesMatch && usesMatch[1]) {
+            displayName =
+              usesMatch[1]?.trim().split("@")[0] || `Step ${stepIndex}`;
+            break;
+          }
+          const runMatch = nextLine.match(/run:\s*(.+?)(?:\s*#|$)/);
+          if (runMatch && runMatch[1]) {
+            displayName = runMatch[1].trim().substring(0, 30);
+            break;
+          }
+        }
+
+        const step = { id: stepName, name: displayName, jobName: currentJob };
+        if (currentJob && jobMap[currentJob]) {
+          jobMap[currentJob]?.steps.push(step);
+        }
+        allSteps.push(step);
       } else if (currentJob && /needs:/.test(line)) {
-        // Parse needs for this job
+        // Parse needs for job
         const needsSplit = line.split("needs:");
         if (needsSplit[1]) {
           let needsVal: string | string[] = needsSplit[1].trim();
@@ -176,28 +311,51 @@ function parseJobsFromYaml(yaml: string) {
             jobMap[currentJob]!.needs = needsVal;
           }
         }
+        inSteps = false;
       }
     }
   }
-  // Build edges
-  interface ParsedJob {
-    name: string;
-    needs: string[];
-  }
-  interface JobMap {
-    [key: string]: ParsedJob;
-  }
+
+  // Build edges: job dependencies + step sequences within jobs
   interface Edge {
     from: string;
     to: string;
+    type: "job" | "step-sequence";
   }
   const edges: Edge[] = [];
+
+  // Job dependencies
   Object.values(jobMap).forEach((job: any) => {
     job.needs.forEach((need: string) => {
-      if (jobMap[need]) edges.push({ from: need, to: job.name });
+      if (jobMap[need]) {
+        // Edge from last step of needed job to first step of current job
+        const needJobLastStep =
+          jobMap[need].steps.length > 0
+            ? jobMap[need].steps[jobMap[need].steps.length - 1].id
+            : need;
+        const currJobFirstStep =
+          job.steps.length > 0 ? job.steps[0].id : job.name;
+        edges.push({
+          from: needJobLastStep,
+          to: currJobFirstStep,
+          type: "job",
+        });
+      }
     });
   });
-  return { jobs: Object.values(jobMap), edges };
+
+  // Step sequences within jobs
+  Object.values(jobMap).forEach((job: any) => {
+    for (let i = 0; i < job.steps.length - 1; i++) {
+      edges.push({
+        from: job.steps[i].id,
+        to: job.steps[i + 1].id,
+        type: "step-sequence",
+      });
+    }
+  });
+
+  return { jobs: Object.values(jobMap), steps: allSteps, edges };
 }
 
 export default function RunExplorerPage() {
@@ -321,10 +479,16 @@ export default function RunExplorerPage() {
     : [];
 
   // --- Job graph from workflow YAML ---
-  type Job = { name: string; needs: string[] };
-  type Edge = { from: string; to: string };
-  const [jobGraph, setJobGraph] = useState<{ jobs: Job[]; edges: Edge[] }>({
+  type Job = { name: string; needs: string[]; steps: any[] };
+  type Step = { id: string; name: string; jobName: string };
+  type Edge = { from: string; to: string; type?: "job" | "step-sequence" };
+  const [jobGraph, setJobGraph] = useState<{
+    jobs: Job[];
+    steps: Step[];
+    edges: Edge[];
+  }>({
     jobs: [],
+    steps: [],
     edges: [],
   });
   useEffect(() => {
@@ -340,7 +504,11 @@ export default function RunExplorerPage() {
         }
       }
     }
-    let parsed: { jobs: Job[]; edges: Edge[] } = { jobs: [], edges: [] };
+    let parsed: { jobs: Job[]; steps: Step[]; edges: Edge[] } = {
+      jobs: [],
+      steps: [],
+      edges: [],
+    };
     if (workflow && workflow.content) {
       parsed = parseJobsFromYaml(workflow.content);
     }
@@ -357,47 +525,110 @@ export default function RunExplorerPage() {
       Array.isArray(selectedRun.jobs) &&
       selectedRun.jobs.length > 0
     ) {
-      parsed.jobs = selectedRun.jobs.map((j) => ({ name: j.name, needs: [] }));
+      parsed.jobs = selectedRun.jobs.map((j) => ({
+        name: j.name,
+        needs: [],
+        steps: [],
+      }));
+      parsed.steps = [];
       parsed.edges = [];
     }
     setJobGraph(parsed);
   }, [pipelineData, selectedRunId]);
 
   // Layout jobs horizontally, and set status from selected run if available
-  let selectedRun = null;
-  if (pipelineData && pipelineData.workflows) {
+  const selectedRun = React.useMemo(() => {
+    if (!pipelineData?.workflows) return null;
     const allRuns = pipelineData.workflows.flatMap((w) => w.recentRuns);
-    selectedRun =
-      allRuns.find((r) => r.id === selectedRunId) || allRuns[0] || null;
-  }
-  // Map job name to job status from selected run
-  const jobStatusMap: { [key: string]: string } = {};
-  if (selectedRun && Array.isArray(selectedRun.jobs)) {
-    for (const job of selectedRun.jobs) {
-      jobStatusMap[job.name] = getJobStatus(job);
+    return allRuns.find((r) => r.id === selectedRunId) || allRuns[0] || null;
+  }, [pipelineData, selectedRunId]);
+
+  // Map job name to job status and timing from selected run
+  const jobDataMap = React.useMemo(() => {
+    const map: {
+      [key: string]: { status: string; duration: string; startedAt?: string };
+    } = {};
+    if (selectedRun?.jobs && Array.isArray(selectedRun.jobs)) {
+      for (const job of selectedRun.jobs) {
+        map[job.name] = {
+          status: getJobStatus(job),
+          duration: getDuration(job.startedAt || "", job.completedAt || null),
+          startedAt: job.startedAt || undefined,
+        };
+      }
     }
-  }
-  // Only show pending or running jobs in the graph
-  const allVizNodes = jobGraph.jobs.map((job, idx) => ({
-    left: 60 + idx * 260,
-    top: 200,
-    name: job.name,
-    status: jobStatusMap[job.name] || "pending",
-    duration: "",
-    meta: "",
-    id: job.name,
-  }));
-  // Show all jobs in the graph (not just pending/running)
-  const vizNodes = allVizNodes;
-  const jobNameToIdx = Object.fromEntries(vizNodes.map((n, i) => [n.name, i]));
-  const jobEdges = jobGraph.edges
-    .map((edge) => ({
-      from: jobNameToIdx[edge.from],
-      to: jobNameToIdx[edge.to],
-    }))
-    .filter(
-      (edge) => typeof edge.from === "number" && typeof edge.to === "number",
-    );
+    return map;
+  }, [selectedRun]);
+
+  // Create nodes for jobs and steps with proper layout - memoized to update when data changes
+  const { vizNodes, nodeIndexMap } = React.useMemo(() => {
+    const allVizNodes: any[] = [];
+    const nodeMap: { [key: string]: { index: number; isStep: boolean } } = {};
+
+    // Calculate layout: jobs are 300px apart horizontally
+    jobGraph.jobs.forEach((job, jobIdx) => {
+      const jobNodeId = job.name;
+      const jobLeft = 60 + jobIdx * 300;
+      const jobTop = 150;
+      const jobData = jobDataMap[job.name];
+
+      allVizNodes.push({
+        id: jobNodeId,
+        isJob: true,
+        left: jobLeft,
+        top: jobTop,
+        name: job.name,
+        status: jobData?.status || "pending",
+        duration: jobData?.duration || "-",
+        meta: jobData?.startedAt
+          ? new Date(jobData.startedAt).toLocaleTimeString()
+          : "",
+      });
+      nodeMap[jobNodeId] = { index: allVizNodes.length - 1, isStep: false };
+
+      // Add steps below this job
+      if (job.steps && job.steps.length > 0) {
+        job.steps.forEach((step, stepIdx) => {
+          const stepTop = jobTop + 130 + stepIdx * 130;
+          allVizNodes.push({
+            id: step.id,
+            isStep: true,
+            left: jobLeft,
+            top: stepTop,
+            name: step.name,
+            status: "pending",
+            duration: "",
+            meta: `Step ${stepIdx + 1}`,
+          });
+          nodeMap[step.id] = { index: allVizNodes.length - 1, isStep: true };
+        });
+      }
+    });
+
+    const indexMap: { [key: string]: number } = {};
+    allVizNodes.forEach((n, i) => {
+      indexMap[n.id] = i;
+    });
+
+    return { vizNodes: allVizNodes, nodeIndexMap: indexMap };
+  }, [jobGraph, jobDataMap]);
+
+  // Build edges - memoized to avoid recalculating on every render
+  const jobEdges = React.useMemo(() => {
+    return jobGraph.edges
+      .map((edge) => ({
+        from: nodeIndexMap[edge.from],
+        to: nodeIndexMap[edge.to],
+        type: edge.type || "job",
+      }))
+      .filter(
+        (edge) =>
+          typeof edge.from === "number" &&
+          typeof edge.to === "number" &&
+          edge.from >= 0 &&
+          edge.to >= 0,
+      );
+  }, [jobGraph.edges, nodeIndexMap]);
 
   // If no projects, show message
   if (projects.length === 0) {
@@ -805,16 +1036,38 @@ export default function RunExplorerPage() {
                     const from = vizNodes[edge.from];
                     const to = vizNodes[edge.to];
                     if (!from || !to) return null;
+
+                    const fromWidth = from.isStep
+                      ? STEP_NODE_WIDTH
+                      : NODE_WIDTH;
+                    const toWidth = to.isStep ? STEP_NODE_WIDTH : NODE_WIDTH;
+                    const fromHeight = from.isStep
+                      ? STEP_NODE_HEIGHT
+                      : NODE_HEIGHT;
+                    const toHeight = to.isStep ? STEP_NODE_HEIGHT : NODE_HEIGHT;
+
+                    const isStepSequence = edge.type === "step-sequence";
+                    const strokeDash = isStepSequence ? "5,5" : "0";
+
                     return (
                       <line
                         key={i}
-                        x1={from.left + NODE_WIDTH}
-                        y1={from.top + NODE_HEIGHT / 2}
+                        x1={from.left + fromWidth}
+                        y1={from.top + fromHeight / 2}
                         x2={to.left}
-                        y2={to.top + NODE_HEIGHT / 2}
-                        stroke="var(--border)"
-                        strokeWidth="2"
-                        markerEnd="url(#arrowhead)"
+                        y2={to.top + toHeight / 2}
+                        stroke={
+                          isStepSequence
+                            ? "rgba(100, 150, 200, 0.4)"
+                            : "var(--border)"
+                        }
+                        strokeWidth={isStepSequence ? "1.5" : "2"}
+                        strokeDasharray={strokeDash}
+                        markerEnd={
+                          isStepSequence
+                            ? "url(#arrowhead-step)"
+                            : "url(#arrowhead)"
+                        }
                       />
                     );
                   })}
@@ -830,13 +1083,31 @@ export default function RunExplorerPage() {
                     >
                       <polygon points="0 0, 8 3, 0 6" fill="var(--border)" />
                     </marker>
+                    <marker
+                      id="arrowhead-step"
+                      markerWidth="8"
+                      markerHeight="6"
+                      refX="8"
+                      refY="3"
+                      orient="auto"
+                      markerUnits="strokeWidth"
+                    >
+                      <polygon
+                        points="0 0, 8 3, 0 6"
+                        fill="rgba(100, 150, 200, 0.4)"
+                      />
+                    </marker>
                   </defs>
                 </svg>
-                {/* Render job nodes */}
+                {/* Render job and step nodes */}
                 {vizNodes.length > 0 ? (
-                  vizNodes.map((node, idx) => (
-                    <PipelineNode key={node.id || idx} {...node} />
-                  ))
+                  vizNodes.map((node, idx) =>
+                    node.isStep ? (
+                      <StepNode key={node.id || idx} {...node} />
+                    ) : (
+                      <PipelineNode key={node.id || idx} {...node} />
+                    ),
+                  )
                 ) : !isLoading && !loading ? (
                   <div
                     style={{
@@ -896,7 +1167,7 @@ export default function RunExplorerPage() {
                   (() => {
                     // Find the run details
                     const run = pipelineData?.workflows
-                      .flatMap((w) => w.recentRuns)
+                      ?.flatMap((w) => w.recentRuns)
                       .find((r) => r.id === selectedRunId);
 
                     if (!run) {
@@ -1146,10 +1417,10 @@ export default function RunExplorerPage() {
             padding: 24px !important;
           }
           .pipeline-graph {
-            transform: scale(0.45);
+            transform: scale(0.35);
             transform-origin: top left;
-            margin-bottom: -440px;
-            margin-right: -550px;
+            margin-bottom: -640px;
+            margin-right: -650px;
           }
         }
         .graph-view-container {
@@ -1167,7 +1438,7 @@ export default function RunExplorerPage() {
         .pipeline-graph {
           position: relative;
           width: 1000px;
-          height: 800px;
+          height: 1200px;
         }
         @keyframes spin {
           0% {
