@@ -188,4 +188,125 @@ Return ONLY valid JSON, no additional text.`;
       };
     }
   }
+
+  /**
+   * Generate AI-powered optimization suggestions for CI/CD pipelines
+   */
+  async generateOptimizationSuggestions(pipelineMetrics: {
+    pipelineHealth: number;
+    failedRuns: number;
+    totalRuns: number;
+    avgBuildDuration: number;
+    peakBuildTime: number;
+    projectCount: number;
+    recentActivities: Array<{ status: string; conclusion?: string }>;
+  }): Promise<
+    Array<{
+      id: string;
+      type: string;
+      title: string;
+      description: string;
+      impact: 'high' | 'medium' | 'low';
+      estimatedSavings?: string;
+    }>
+  > {
+    try {
+      // Handle empty data case
+      const hasData = pipelineMetrics.totalRuns > 0;
+      const recentStatuses =
+        pipelineMetrics.recentActivities.length > 0
+          ? pipelineMetrics.recentActivities
+              .slice(0, 10)
+              .map((a) => a.conclusion || a.status)
+              .join(', ')
+          : 'No recent activity';
+
+      const prompt = `You are a DevOps and CI/CD expert analyzing pipeline performance metrics. Based on the following data, provide 2-4 specific, actionable optimization suggestions.
+
+Pipeline Metrics:
+- Projects Connected: ${pipelineMetrics.projectCount}
+- ${hasData ? `Success Rate: ${pipelineMetrics.pipelineHealth}%` : 'No pipeline runs yet'}
+- ${hasData ? `Failed Runs: ${pipelineMetrics.failedRuns} out of ${pipelineMetrics.totalRuns}` : 'No failed runs data'}
+- ${hasData ? `Average Build Duration: ${Math.round(pipelineMetrics.avgBuildDuration)}s (${Math.round(pipelineMetrics.avgBuildDuration / 60)}m)` : 'No build duration data'}
+- ${hasData ? `Peak Build Time: ${Math.round(pipelineMetrics.peakBuildTime)}s` : 'No peak time data'}
+- Recent Build Statuses: ${recentStatuses}
+
+Context: ${hasData ? 'The user has active pipelines with data.' : 'The user has just set up their CI/CD dashboard and has no pipeline runs yet.'}
+
+Analyze the metrics and provide optimization suggestions in the following JSON format:
+{
+  "suggestions": [
+    {
+      "type": "performance|reliability|security|cost|setup",
+      "title": "Brief title (max 50 chars)",
+      "description": "Detailed actionable recommendation (max 150 chars)",
+      "impact": "high|medium|low",
+      "estimatedSavings": "Optional: e.g., '~5 minutes per build' or '~30% faster builds'"
+    }
+  ]
+}
+
+Rules:
+1. If no data exists (totalRuns = 0), suggest getting started steps like connecting repositories, setting up workflows, or running first builds
+2. If success rate < 80%, prioritize reliability improvements
+3. If avg build time > 5 minutes, suggest performance optimizations
+4. If builds are fast (<30s), acknowledge efficiency and suggest advanced monitoring
+5. If no projects connected, suggest integration steps
+6. Be specific and actionable
+7. Return ONLY valid JSON, no markdown formatting
+8. Provide 2-4 suggestions max`;
+
+      const response = await this.model.generateContent(prompt);
+      const text = response.response.text();
+
+      // Clean up markdown formatting if present
+      let cleanedText = text.trim();
+      if (cleanedText.startsWith('```json')) {
+        cleanedText = cleanedText
+          .replace(/```json\n?/g, '')
+          .replace(/```\n?/g, '');
+      }
+
+      const parsed = JSON.parse(cleanedText);
+
+      return parsed.suggestions.map((s: any, index: number) => ({
+        id: `ai-${index}`,
+        type: s.type,
+        title: s.title,
+        description: s.description,
+        impact: s.impact,
+        estimatedSavings: s.estimatedSavings,
+      }));
+    } catch (error) {
+      console.error('Error generating optimization suggestions:', error);
+
+      // Return context-aware default suggestion based on data availability
+      const hasData = pipelineMetrics.totalRuns > 0;
+
+      if (!hasData || pipelineMetrics.projectCount === 0) {
+        return [
+          {
+            id: 'default-setup',
+            type: 'setup',
+            title: 'Get Started with CI/CD',
+            description:
+              'Connect your GitHub repositories and set up workflows to start tracking pipeline performance and get AI-powered insights.',
+            impact: 'high',
+          },
+        ];
+      }
+
+      // Return default suggestion for active pipelines if AI fails
+      return [
+        {
+          id: 'default',
+          type: 'reliability',
+          title: 'System Running Smoothly',
+          description:
+            'Your pipelines are performing well! Consider implementing advanced monitoring and predictive analytics.',
+          impact: 'low',
+        },
+      ];
+    }
+  }
 }
