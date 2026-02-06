@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { GithubAppService } from '../integrations/github-app.service';
 import { Prisma } from '@prisma/client';
 import { CreateOrganizationDto } from './dto/organization.dto';
+import { JenkinsService } from 'src/integrations/jenkins.service';
 
 @Injectable()
 export class OrganizationService {
@@ -82,6 +83,10 @@ export class OrganizationService {
         userId,
         orgId,
       );
+      // await this.jenkinsService.syncJenkinsProjectsForOrganization(
+      //   userId,
+      //   orgId,
+      // );
       console.log(
         `[OrganizationService] Successfully synced repositories for org ${orgId}`,
       );
@@ -106,6 +111,7 @@ export class OrganizationService {
   constructor(
     private prisma: PrismaService,
     private githubAppService: GithubAppService,
+    private jenkinsService: JenkinsService,
   ) {}
 
   async getOrganizationsForUser(userId: string) {
