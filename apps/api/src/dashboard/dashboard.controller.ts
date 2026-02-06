@@ -20,7 +20,7 @@ export class DashboardController {
 
     if (isRefresh) {
       this.logger.log(`Manual refresh requested for user: ${userId}`);
-      return this.dashboardService.fetchFreshMetrics(userId);
+      return this.dashboardService.fetchFreshMetricsSave(userId);
     }
 
     this.logger.log(`Getting dashboard metrics for user: ${userId}`);
