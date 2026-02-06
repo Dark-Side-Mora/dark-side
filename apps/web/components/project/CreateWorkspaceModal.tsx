@@ -159,6 +159,16 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
             >
               Primary Provider
             </label>
+            <p
+              style={{
+                fontSize: "13px",
+                color: "var(--text-secondary)",
+                marginBottom: "12px",
+                lineHeight: "1.5",
+              }}
+            >
+              GitHub workspaces will be your GitHub organizations
+            </p>
             <div
               style={{
                 display: "grid",
@@ -166,7 +176,7 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
                 gap: "12px",
               }}
             >
-              <div
+              {/* <div
                 onClick={() => setProvider("github")}
                 style={{
                   padding: "16px",
@@ -183,7 +193,7 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
               >
                 <div style={{ fontSize: "24px", marginBottom: "4px" }}>🐙</div>
                 <div style={{ fontSize: "14px", fontWeight: 700 }}>GitHub</div>
-              </div>
+              </div> */}
               <div
                 onClick={() => setProvider("jenkins")}
                 style={{

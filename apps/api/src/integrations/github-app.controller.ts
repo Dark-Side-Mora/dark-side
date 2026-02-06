@@ -42,20 +42,6 @@ export class GithubAppController {
     console.log(
       `[GithubAppController] Initiating GitHub App authorization for user ${userId}, org: ${organizationId}`,
     );
-
-    if (!organizationId) {
-      throw new BadRequestException(
-        'organizationId is required to track GitHub connection',
-      );
-    }
-
-    // Create tracking record
-    await this.githubAppService.createPendingConnection(userId, organizationId);
-
-    console.log(
-      `[GithubAppController] Created pending connection for user ${userId} and organization ${organizationId}`,
-    );
-
     const authUrl = this.githubAppService.generateAuthorizationUrl(
       userId,
       redirectUri,
@@ -83,15 +69,10 @@ export class GithubAppController {
     const { redirectUri, organizationId } = body;
     const userId = req.user.id;
 
-    if (!organizationId) {
-      throw new BadRequestException(
-        'organizationId is required to track GitHub installation',
-      );
-    }
-
     // Create tracking record
-    await this.githubAppService.createPendingConnection(userId, organizationId);
-
+    // if (organizationId) {
+    //   await this.githubAppService.createPendingConnection(userId, organizationId);
+    // }
     const installUrl = this.githubAppService.generateInstallationUrl(
       userId,
       redirectUri,
@@ -230,34 +211,34 @@ export class GithubAppController {
    * Sync repositories for a specific organization
    * Called when user visits an organization after connecting GitHub
    */
-  @UseGuards(JwtAuthGuard)
-  @Post('organizations/:organizationId/sync-repos')
-  async syncRepositoriesForOrganization(
-    @Req() req,
-    @Param('organizationId') organizationId: string,
-  ) {
-    try {
-      if (!organizationId) {
-        throw new BadRequestException('organizationId is required');
-      }
+  // @UseGuards(JwtAuthGuard)
+  // @Post('organizations/:organizationId/sync-repos')
+  // async syncRepositoriesForOrganization(
+  //   @Req() req,
+  //   @Param('organizationId') organizationId: string,
+  // ) {
+  //   try {
+  //     if (!organizationId) {
+  //       throw new BadRequestException('organizationId is required');
+  //     }
 
-      const result =
-        await this.githubAppService.syncRepositoriesForOrganization(
-          req.user.id,
-          organizationId,
-        );
+  //     const result =
+  //       await this.githubAppService.syncRepositoriesForOrganization(
+  //         req.user.id,
+  //         organizationId,
+  //       );
 
-      return {
-        statusCode: HttpStatus.OK,
-        message: 'Repositories synced successfully',
-        data: result,
-      };
-    } catch (error) {
-      throw new InternalServerErrorException(
-        `Failed to sync repositories: ${error.message}`,
-      );
-    }
-  }
+  //     return {
+  //       statusCode: HttpStatus.OK,
+  //       message: 'Repositories synced successfully',
+  //       data: result,
+  //     };
+  //   } catch (error) {
+  //     throw new InternalServerErrorException(
+  //       `Failed to sync repositories: ${error.message}`,
+  //     );
+  //   }
+  // }
 
   /**
    * POST /integrations/github-app/installations/:installationId/sync

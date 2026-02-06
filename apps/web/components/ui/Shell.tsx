@@ -753,9 +753,9 @@ export const Shell = ({ children }: { children: React.ReactNode }) => {
               >
                 {user?.user_metadata.first_name || user?.email || "User"}
               </div>
-              <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
-                Pro License
-              </div>
+              <div
+                style={{ fontSize: "11px", color: "var(--text-secondary)" }}
+              ></div>
             </div>
           </div>
         </div>
@@ -843,9 +843,7 @@ export const Shell = ({ children }: { children: React.ReactNode }) => {
               <Button
                 size="sm"
                 variant="secondary"
-                onClick={() =>
-                  window.open("https://github.com/Dark-Side-Mora", "_blank")
-                }
+                onClick={() => router.push("/docs")}
               >
                 Docs
               </Button>

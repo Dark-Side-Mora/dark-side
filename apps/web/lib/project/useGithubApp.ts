@@ -10,11 +10,6 @@ export const useGithubApp = () => {
   // Authorize GitHub App and create tracking record
   const authorizeGithubApp = async (redirectUri: string) => {
     const orgId = organizationContext.currentOrgId;
-    if (!orgId) {
-      throw new Error(
-        "No organization available. Please create or select an organization first.",
-      );
-    }
     return apiPost(`${API_URL}/integrations/github-app/authorize`, {
       redirectUri,
       organizationId: orgId,
@@ -31,11 +26,6 @@ export const useGithubApp = () => {
   // Get GitHub App installation URL
   const installGithubApp = async (redirectUri: string) => {
     const orgId = organizationContext.currentOrgId;
-    if (!orgId) {
-      throw new Error(
-        "No organization available. Please create or select an organization first.",
-      );
-    }
     return apiPost(`${API_URL}/integrations/github-app/install`, {
       redirectUri,
       organizationId: orgId,
