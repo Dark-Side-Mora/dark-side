@@ -545,60 +545,17 @@ export default function IntegrationsPage() {
                 </div>
               </div>
 
-              <div style={{ marginBottom: "16px" }}>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    color: "var(--text-secondary)",
-                    textTransform: "uppercase",
-                    marginBottom: "4px",
-                  }}
-                >
-                  API Base URL
-                </label>
-                <div
-                  style={{
-                    padding: "10px 14px",
-                    backgroundColor: "rgba(0,0,0,0.3)",
-                    border: "1px solid var(--border)",
-                    borderRadius: "8px",
-                    fontFamily: "monospace",
-                    fontSize: "13px",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  {window.location.origin}
-                  <button
-                    onClick={() =>
-                      navigator.clipboard.writeText(window.location.origin)
-                    }
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "var(--accent-cyan)",
-                      cursor: "pointer",
-                      fontSize: "12px",
-                    }}
-                  >
-                    Copy
-                  </button>
-                </div>
-                <p
-                  style={{
-                    fontSize: "11px",
-                    color: "rgba(255, 165, 0, 0.8)",
-                    marginTop: "6px",
-                  }}
-                >
-                  ⚠️ The plugin handles the{" "}
-                  <code>/integrations/jenkins/push</code> path automatically.
-                  Ensure this Base URL is accessible from your Jenkins server.
-                </p>
-              </div>
+              <p
+                style={{
+                  fontSize: "12px",
+                  color: "var(--text-secondary)",
+                  marginTop: "16px",
+                  lineHeight: "1.6",
+                }}
+              >
+                💡 The plugin automatically connects to CI-Insight. Advanced
+                users can override the API URL in Jenkins settings if needed.
+              </p>
             </div>
 
             <Button

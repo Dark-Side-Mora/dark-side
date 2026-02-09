@@ -37,12 +37,10 @@ export class JenkinsService {
     }
 
     // 2. Resolve Workspace (Organization)
-    // For Jenkins, we assume the token is linked to a specific user and their organizations.
-    // In our simplified "Push-to-Provision" model, we'll look for an organization
-    // that the user owns or belongs to with 'jenkins' as primary provider.
+    // For Jenkins, we'll use the first organization the user belongs to.
+    // Jenkins is provider-agnostic and can work with any organization.
     const organization = await (this.prisma.organization as any).findFirst({
       where: {
-        provider: 'jenkins',
         members: {
           some: {
             userId: connection.userId,
@@ -53,11 +51,11 @@ export class JenkinsService {
 
     if (!organization) {
       console.error(
-        '[JenkinsService] No Jenkins workspace found for user:',
+        '[JenkinsService] No organization found for user:',
         connection.userId,
       );
       throw new NotFoundException(
-        'No Jenkins workspace found. Please create one first.',
+        'No organization found. Please create or join an organization first.',
       );
     }
 

@@ -11,7 +11,7 @@ import org.kohsuke.stapler.QueryParameter;
 public class CIInsightConfiguration extends GlobalConfiguration {
 
     private String apiToken;
-    private String apiUrl = "http://localhost:3000";
+    private String apiUrl = "https://ci-insight.netlify.app/api";
 
     public CIInsightConfiguration() {
         load();
