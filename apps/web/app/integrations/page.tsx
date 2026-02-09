@@ -107,7 +107,7 @@ export default function IntegrationsPage() {
       id: "jenkins",
       name: "Jenkins",
       description:
-        "Connect your local or private Jenkins servers via push-based build tokens.",
+        "Connect your Jenkins servers using our official plugin for automated build data syncing.",
       logo: <LogoJenkins />,
       connected: !!jenkinsSetup,
       action: handleConnectJenkins,
@@ -320,6 +320,8 @@ export default function IntegrationsPage() {
               padding: "32px",
               borderRadius: "24px",
               boxShadow: "0 20px 50px rgba(0,0,0,0.5)",
+              maxHeight: "90vh",
+              overflowY: "auto",
             }}
           >
             <div
@@ -347,121 +349,255 @@ export default function IntegrationsPage() {
               </button>
             </div>
 
-            <p
-              style={{
-                color: "var(--text-secondary)",
-                marginBottom: "24px",
-                fontSize: "14px",
-                lineHeight: "1.6",
-              }}
-            >
-              Use this token in your Jenkins Pipeline code to push build data to
-              CI-Insight. It serves as your unique identifier for all Jenkins
-              projects.
-            </p>
-
-            <div style={{ marginBottom: "24px" }}>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  color: "var(--accent-cyan)",
-                  textTransform: "uppercase",
-                  marginBottom: "8px",
-                }}
-              >
-                Integration Token
-              </label>
-              <div
-                style={{
-                  display: "flex",
-                  gap: "8px",
-                  padding: "12px 16px",
-                  backgroundColor: "rgba(0,0,0,0.3)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "12px",
-                  wordBreak: "break-all",
-                  fontFamily: "monospace",
-                  fontSize: "14px",
-                }}
-              >
-                {jenkinsSetup.token}
-              </div>
-            </div>
-
             <div style={{ marginBottom: "32px" }}>
-              <label
+              <h3
                 style={{
-                  display: "block",
-                  fontSize: "12px",
+                  fontSize: "16px",
                   fontWeight: 700,
-                  color: "var(--accent-cyan)",
-                  textTransform: "uppercase",
-                  marginBottom: "8px",
-                }}
-              >
-                Ingestion Endpoint
-              </label>
-              <div
-                style={{
-                  display: "flex",
-                  gap: "8px",
-                  padding: "12px 16px",
-                  backgroundColor: "rgba(0,0,0,0.3)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "12px",
-                  fontFamily: "monospace",
-                  fontSize: "14px",
-                }}
-              >
-                {jenkinsSetup.endpoint}
-              </div>
-            </div>
-            <div style={{ marginBottom: "32px" }}>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  color: "var(--accent-cyan)",
-                  textTransform: "uppercase",
                   marginBottom: "12px",
+                  color: "var(--accent-cyan)",
                 }}
               >
-                How to use (Jenkins Pipeline)
-              </label>
+                Step 1: Install the CI-Insight Plugin
+              </h3>
+              <p
+                style={{
+                  color: "var(--text-secondary)",
+                  fontSize: "14px",
+                  marginBottom: "16px",
+                  lineHeight: "1.6",
+                }}
+              >
+                Download the official Jenkins plugin and upload it to your
+                Jenkins instance.
+              </p>
+
+              <div
+                style={{ display: "flex", gap: "12px", marginBottom: "20px" }}
+              >
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => window.open("/ci-insight.hpi", "_blank")}
+                >
+                  Download .hpi Plugin
+                </Button>
+              </div>
+
               <div
                 style={{
+                  backgroundColor: "rgba(255,255,255,0.03)",
                   padding: "16px",
-                  backgroundColor: "rgba(0,0,0,0.4)",
-                  border: "1px solid var(--border)",
                   borderRadius: "12px",
-                  fontFamily: "monospace",
-                  fontSize: "12px",
-                  lineHeight: "1.5",
-                  color: "var(--text-secondary)",
-                  overflowX: "auto",
-                  whiteSpace: "pre",
+                  border: "1px solid var(--border)",
                 }}
               >
-                {`node {
-  stage('Push to CI-Insight') {
-    script {
-      def payload = [
-        repository: "your-repo-name",
-        status: currentBuild.currentResult ?: "SUCCESS",
-        buildNumber: env.BUILD_NUMBER,
-        workflowContent: readFile('Jenkinsfile'),
-        jobs: [[name: "Build", status: "SUCCESS", logs: "Done"]]
-      ]
-      writeFile file: 'payload.json', text: groovy.json.JsonOutput.toJson(payload)
-      sh "curl -X POST -H 'Content-Type: application/json' \\
-          -H 'x-ci-insight-token: ${jenkinsSetup.token}' \\
-          -d @payload.json ${jenkinsSetup.endpoint}"
-    }
-  }
-}`}
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    marginBottom: "8px",
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  (Optional) Enter your Jenkins URL for shortcut links:
+                </label>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <input
+                    id="jenkins-url-input"
+                    type="text"
+                    placeholder="https://jenkins.example.com"
+                    style={{
+                      flex: 1,
+                      backgroundColor: "rgba(0,0,0,0.3)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "8px",
+                      padding: "8px 12px",
+                      color: "white",
+                      fontSize: "14px",
+                    }}
+                    onChange={(e) => {
+                      const url = e.target.value.replace(/\/$/, "");
+                      const uploadLink = document.getElementById(
+                        "jenkins-upload-link",
+                      ) as HTMLAnchorElement;
+                      const configLink = document.getElementById(
+                        "jenkins-config-link",
+                      ) as HTMLAnchorElement;
+                      if (uploadLink)
+                        uploadLink.href = url
+                          ? `${url}/pluginManager/advanced`
+                          : "#";
+                      if (configLink)
+                        configLink.href = url ? `${url}/manage/configure` : "#";
+                    }}
+                  />
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "16px",
+                    marginTop: "12px",
+                    fontSize: "13px",
+                  }}
+                >
+                  <a
+                    id="jenkins-upload-link"
+                    href="#"
+                    target="_blank"
+                    style={{
+                      color: "var(--accent-cyan)",
+                      textDecoration: "none",
+                    }}
+                  >
+                    → Open Plugin Upload
+                  </a>
+                  <a
+                    id="jenkins-config-link"
+                    href="#"
+                    target="_blank"
+                    style={{
+                      color: "var(--accent-cyan)",
+                      textDecoration: "none",
+                    }}
+                  >
+                    → Open Configuration
+                  </a>
+                </div>
+                <p
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--text-secondary)",
+                    marginTop: "8px",
+                  }}
+                >
+                  Note: Your URL is only used in your browser and is never
+                  saved.
+                </p>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: "32px" }}>
+              <h3
+                style={{
+                  fontSize: "16px",
+                  fontWeight: 700,
+                  marginBottom: "12px",
+                  color: "var(--accent-cyan)",
+                }}
+              >
+                Step 2: Configure CI-Insight
+              </h3>
+              <p
+                style={{
+                  color: "var(--text-secondary)",
+                  fontSize: "14px",
+                  marginBottom: "16px",
+                  lineHeight: "1.6",
+                }}
+              >
+                Navigate to <b>Manage Jenkins</b> &gt; <b>System</b> and find
+                the <b>CI-Insight Configuration</b> section.
+              </p>
+
+              <div style={{ marginBottom: "16px" }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    color: "var(--text-secondary)",
+                    textTransform: "uppercase",
+                    marginBottom: "4px",
+                  }}
+                >
+                  API Token
+                </label>
+                <div
+                  style={{
+                    padding: "10px 14px",
+                    backgroundColor: "rgba(0,0,0,0.3)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "8px",
+                    fontFamily: "monospace",
+                    fontSize: "13px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  {jenkinsSetup.token}
+                  <button
+                    onClick={() =>
+                      navigator.clipboard.writeText(jenkinsSetup.token)
+                    }
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--accent-cyan)",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                    }}
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: "16px" }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    color: "var(--text-secondary)",
+                    textTransform: "uppercase",
+                    marginBottom: "4px",
+                  }}
+                >
+                  API Base URL
+                </label>
+                <div
+                  style={{
+                    padding: "10px 14px",
+                    backgroundColor: "rgba(0,0,0,0.3)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "8px",
+                    fontFamily: "monospace",
+                    fontSize: "13px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  {window.location.origin}
+                  <button
+                    onClick={() =>
+                      navigator.clipboard.writeText(window.location.origin)
+                    }
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--accent-cyan)",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                    }}
+                  >
+                    Copy
+                  </button>
+                </div>
+                <p
+                  style={{
+                    fontSize: "11px",
+                    color: "rgba(255, 165, 0, 0.8)",
+                    marginTop: "6px",
+                  }}
+                >
+                  ⚠️ The plugin handles the{" "}
+                  <code>/integrations/jenkins/push</code> path automatically.
+                  Ensure this Base URL is accessible from your Jenkins server.
+                </p>
               </div>
             </div>
 
@@ -470,7 +606,7 @@ export default function IntegrationsPage() {
               style={{ width: "100%" }}
               onClick={() => setShowJenkinsModal(false)}
             >
-              Got it, thanks!
+              Finish Setup
             </Button>
           </Card>
         </div>
