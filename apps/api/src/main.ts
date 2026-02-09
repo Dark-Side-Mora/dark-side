@@ -7,15 +7,17 @@ async function bootstrap() {
   // Enable CORS for frontend
   app.enableCors({
     origin: [
+      'https://ci-insight.netlify.app',
       'http://localhost:3000',
       'http://localhost:3001',
-      'http://127.0.0.1:3000',
-      'http://127.0.0.1:3001',
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
+
+  // Set Global Prefix for Path-Based Routing
+  app.setGlobalPrefix('ci-insight');
 
   console.log('[Bootstrap] API Server starting...');
   const port = process.env.PORT ?? 3000;

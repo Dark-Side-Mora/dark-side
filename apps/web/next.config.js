@@ -8,6 +8,14 @@ const nextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        destination: "https://dpdlab1.slt.lk:9122/ci-insight/:path*",
+      },
+    ];
+  },
 };
 
 export default nextConfig;
