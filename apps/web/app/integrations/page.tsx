@@ -553,7 +553,7 @@ export default function IntegrationsPage() {
                   lineHeight: "1.6",
                 }}
               >
-                💡 The plugin automatically connects to CI-Insight. Advanced
+                💡 The plugin connects directly to the backend server. Advanced
                 users can override the API URL in Jenkins settings if needed.
               </p>
             </div>
