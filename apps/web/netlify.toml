@@ -1,0 +1,5 @@
+[[redirects]]
+  from = "/api/*"
+  to = "https://dpdlab1.slt.lk:9122/ci-insight/:splat"
+  status = 200
+  force = true

@@ -4,7 +4,8 @@
 
 model CourseModule {
   id        Int      @id @default(autoincrement())
-  title     S  status    String // 'Completed', 'In Progress', 'Not Started'
+  title     String
+  status    String // 'Completed', 'In Progress', 'Not Started'
   length    String // e.g. '15 mins'
   icon      String // e.g. '🎯'
   order     Int // For ordering modules in UI
