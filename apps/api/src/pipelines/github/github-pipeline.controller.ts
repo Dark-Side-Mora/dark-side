@@ -84,6 +84,51 @@ export class GithubPipelineController {
   }
 
   /**
+   * GET /pipelines/github/:repoIdentifier/runs/:runId/graph
+   * Fetch workflow graph with job dependencies and execution details for visualization
+   *
+   * @param repoIdentifier - Repository in format "owner/repo"
+   * @param runId - Workflow run ID
+   * @param userId - User ID to authenticate with GitHub
+   */
+  @Get(':repoIdentifier/runs/:runId/graph')
+  async fetchWorkflowGraph(
+    @Req() req: any,
+    @Param('repoIdentifier') repoIdentifier: string,
+    @Param('runId') runId: string,
+  ) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        throw new BadRequestException('userId is required');
+      }
+
+      const decodedRepoIdentifier = decodeURIComponent(repoIdentifier);
+      const runIdNum = parseInt(runId, 10);
+
+      if (isNaN(runIdNum)) {
+        throw new BadRequestException('Invalid runId format');
+      }
+
+      const graphData = await this.githubPipelineService.fetchWorkflowGraph(
+        userId,
+        decodedRepoIdentifier,
+        runIdNum,
+      );
+
+      return {
+        statusCode: HttpStatus.OK,
+        message: 'Workflow graph fetched successfully',
+        graph: graphData,
+      };
+    } catch (error) {
+      throw new BadRequestException(
+        `Failed to fetch workflow graph: ${error.message}`,
+      );
+    }
+  }
+
+  /**
    * GET /pipelines/github/:repoIdentifier/workflows
    * Fetch only workflows (without runs) for a repository
    *

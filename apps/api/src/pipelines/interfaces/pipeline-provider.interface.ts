@@ -79,3 +79,33 @@ export interface Job {
   completedAt: string | null;
   logs?: string;
 }
+
+/**
+ * Workflow graph structures for frontend visualization
+ */
+export interface WorkflowStep {
+  name: string;
+  status: string | null;
+  conclusion: string | null;
+  number?: number;
+}
+
+export interface WorkflowJobNode {
+  id: number | string;
+  name: string;
+  status: string | null;
+  conclusion: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  dependencies: string[]; // List of job names this job depends on
+  steps: WorkflowStep[];
+}
+
+export interface WorkflowGraph {
+  runId: number | string;
+  jobs: {
+    [jobName: string]: WorkflowJobNode;
+  };
+  executionOrder: string[];
+  totalDuration?: number; // in milliseconds
+}
