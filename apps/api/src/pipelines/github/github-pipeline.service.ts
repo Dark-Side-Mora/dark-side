@@ -403,4 +403,182 @@ export class GithubPipelineService implements IPipelineProvider {
 
     return workflows;
   }
+
+  /**
+   * Fetch workflow graph for a specific run
+   * Returns job dependencies and execution details for visualization
+   */
+  async fetchWorkflowGraph(
+    userId: string,
+    repoIdentifier: string,
+    runId: number,
+  ): Promise<any> {
+    try {
+      const { owner, repo } = this.parseRepoIdentifier(repoIdentifier);
+      const octokit = await this.getAuthenticatedOctokit(userId, owner, repo);
+
+      // Get run details to find workflow path
+      const { data: runData } = await octokit.actions.getWorkflowRun({
+        owner,
+        repo,
+        run_id: runId,
+      });
+
+      // Get jobs for this run
+      const { data: jobsData } = await octokit.actions.listJobsForWorkflowRun({
+        owner,
+        repo,
+        run_id: runId,
+      });
+
+      // Get workflow file content to understand dependencies
+      const workflowContent = await this.fetchWorkflowFileContent(
+        octokit,
+        owner,
+        repo,
+        runData.path,
+      );
+
+      // Parse workflow file
+      const workflowYaml = this.parseWorkflowYaml(workflowContent);
+
+      // Build graph with dependencies
+      const graph = await this.buildWorkflowGraph(jobsData.jobs, workflowYaml);
+
+      return {
+        runId,
+        workflowName: runData.name,
+        branch: runData.head_branch,
+        status: runData.status,
+        conclusion: runData.conclusion,
+        createdAt: runData.created_at,
+        updatedAt: runData.updated_at,
+        graph,
+      };
+    } catch (error) {
+      console.error(`Error fetching workflow graph for run ${runId}:`, error);
+      throw new InternalServerErrorException(
+        `Failed to fetch workflow graph: ${error.message}`,
+      );
+    }
+  }
+
+  /**
+   * Helper: Parse YAML workflow content
+   */
+  private parseWorkflowYaml(content: string): any {
+    try {
+      const yaml = require('js-yaml');
+      return yaml.load(content);
+    } catch (error) {
+      console.error('Error parsing workflow YAML:', error);
+      return { jobs: {} };
+    }
+  }
+
+  /**
+   * Helper: Build workflow graph from jobs and workflow definition
+   */
+  private async buildWorkflowGraph(
+    jobs: any[],
+    workflowYaml: any,
+  ): Promise<any> {
+    const graph: Record<string, any> = {};
+
+    // Get job definitions from workflow file
+    const jobDefinitions = workflowYaml.jobs || {};
+
+    // Build node for each job
+    for (const job of jobs) {
+      const jobName = job.name;
+      const jobDef = jobDefinitions[jobName] || {};
+
+      // Extract dependencies from 'needs' field
+      const dependencies = Array.isArray(jobDef.needs)
+        ? jobDef.needs
+        : jobDef.needs
+          ? [jobDef.needs]
+          : [];
+
+      // Steps from the job object (GitHub API includes steps in listJobsForWorkflowRun response)
+      const steps = Array.isArray(job.steps)
+        ? (job.steps || []).map((step: any) => ({
+            name: step.name,
+            status: step.status,
+            conclusion: step.conclusion,
+            number: step.number,
+          }))
+        : [];
+
+      graph[jobName] = {
+        id: job.id,
+        name: jobName,
+        status: job.status,
+        conclusion: job.conclusion,
+        startedAt: job.started_at,
+        completedAt: job.completed_at,
+        dependencies, // This is the job dependency list
+        steps, // Steps array
+      };
+    }
+
+    // Calculate execution order using topological sort
+    const executionOrder = this.topologicalSort(graph);
+
+    // Calculate total duration
+    const allJobs = Object.values(graph) as any[];
+    const startTimes = allJobs
+      .filter((j) => j.startedAt)
+      .map((j) => new Date(j.startedAt).getTime());
+    const endTimes = allJobs
+      .filter((j) => j.completedAt)
+      .map((j) => new Date(j.completedAt).getTime());
+
+    const totalDuration =
+      startTimes.length > 0 && endTimes.length > 0
+        ? Math.max(...endTimes) - Math.min(...startTimes)
+        : undefined;
+
+    console.log('[GithubPipelineService] Built workflow graph:', {
+      jobCount: Object.keys(graph).length,
+      jobs: Object.keys(graph),
+      executionOrder,
+    });
+
+    return {
+      jobs: graph,
+      executionOrder,
+      totalDuration,
+    };
+  }
+
+  /**
+   * Helper: Topological sort for job execution order
+   */
+  private topologicalSort(graph: Record<string, any>): string[] {
+    const visited = new Set<string>();
+    const order: string[] = [];
+
+    const visit = (jobName: string) => {
+      if (visited.has(jobName)) return;
+      visited.add(jobName);
+
+      // Visit dependencies first
+      const job = graph[jobName];
+      if (job.dependencies && Array.isArray(job.dependencies)) {
+        for (const dep of job.dependencies) {
+          visit(dep);
+        }
+      }
+
+      order.push(jobName);
+    };
+
+    // Visit all jobs
+    for (const jobName of Object.keys(graph)) {
+      visit(jobName);
+    }
+
+    return order;
+  }
 }
