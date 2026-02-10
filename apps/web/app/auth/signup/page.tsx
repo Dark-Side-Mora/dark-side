@@ -221,7 +221,7 @@ export default function SignupPage() {
                   fontSize: "14px",
                 }}
               >
-                Alex Chen
+                Sahan
               </div>
               <div
                 style={{
@@ -229,7 +229,7 @@ export default function SignupPage() {
                   fontSize: "12px",
                 }}
               >
-                Lead DevOps Engineer, TechFlow
+                Lead DevOps Engineer, Dark-Side
               </div>
             </div>
           </div>

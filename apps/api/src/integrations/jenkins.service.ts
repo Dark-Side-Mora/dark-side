@@ -36,18 +36,50 @@ export class JenkinsService {
       throw new UnauthorizedException('Invalid Jenkins build token');
     }
 
-    // 2. Resolve Workspace (Organization)
-    // For Jenkins, we'll use the first organization the user belongs to.
-    // Jenkins is provider-agnostic and can work with any organization.
-    const organization = await (this.prisma.organization as any).findFirst({
+    // Resolve Workspace (Organization)
+    // First, try to find an organization that already has this project for this user
+    let organization: any = null;
+    const existingProjectForOrg = await this.prisma.project.findFirst({
       where: {
-        members: {
-          some: {
-            userId: connection.userId,
+        repositoryUrl: payload.repository,
+        provider: 'jenkins',
+        organization: {
+          members: {
+            some: {
+              userId: connection.userId,
+            },
           },
         },
       },
+      include: {
+        organization: true,
+      },
     });
+
+    if (existingProjectForOrg) {
+      organization = existingProjectForOrg.organization;
+      console.log(
+        '[JenkinsService] found existing project in organization:',
+        organization.id,
+      );
+    } else {
+      // Fallback to the first organization the user belongs to.
+      organization = await (this.prisma.organization as any).findFirst({
+        where: {
+          members: {
+            some: {
+              userId: connection.userId,
+            },
+          },
+        },
+      });
+      if (organization) {
+        console.log(
+          '[JenkinsService] Falling back to first organization:',
+          organization.id,
+        );
+      }
+    }
 
     if (!organization) {
       console.error(
@@ -100,21 +132,60 @@ export class JenkinsService {
     });
 
     // 5. Create Jobs and Index Logs in OpenSearch
-    if (payload.jobs && Array.isArray(payload.jobs)) {
-      for (const jobData of payload.jobs) {
+    // HACK: Jenkins plugin sends a single "Build" job. We try to parse stages from logs.
+    let jobsToCreate: { name: string; status: string; logs: string }[] = [];
+    const fullLog =
+      payload.jobs && payload.jobs.length > 0 ? payload.jobs[0].logs : '';
+
+    if (fullLog) {
+      const stages = this.extractStagesFromLogs(fullLog);
+      if (stages.length > 0) {
+        console.log(
+          `[JenkinsService] Parsed ${stages.length} stages from logs for ${payload.repository}`,
+        );
+        jobsToCreate = stages.map((stage) => ({
+          name: stage.name,
+          status: 'success', // Default to success, we can't easily parse status per stage from text logs
+          logs: stage.logs,
+        }));
+
+        // If the overall build failed, mark the last stage as failed (simple heuristic)
+        if (
+          this.mapJenkinsStatus(payload.status) === 'failed' &&
+          jobsToCreate.length > 0
+        ) {
+          jobsToCreate[jobsToCreate.length - 1].status = 'failed';
+        }
+      }
+    }
+
+    // If no stages parsed, fallback to payload jobs
+    if (
+      jobsToCreate.length === 0 &&
+      payload.jobs &&
+      Array.isArray(payload.jobs)
+    ) {
+      jobsToCreate = payload.jobs;
+    }
+
+    for (const jobData of jobsToCreate) {
+      try {
+        console.log(`[JenkinsService] Creating job: ${jobData.name}`);
         const job = await (this.prisma.job as any).create({
           data: {
             pipelineId: pipeline.id,
             name: jobData.name,
             status: this.mapJenkinsStatus(jobData.status),
             // Log explicitly NOT stored in Postgres anymore
-            startedAt: new Date(),
+            startedAt: new Date(), // We don't have exact start times for stages from logs
             finishedAt: new Date(),
           },
         });
+        console.log(`[JenkinsService] Job created: ${job.id}`);
 
         // Index detailed logs in OpenSearch/Bonsai
         if (jobData.logs) {
+          console.log(`[JenkinsService] Indexing logs for job: ${job.id}`);
           await this.opensearch.indexLog(project.id, {
             jobId: job.id,
             pipelineId: pipeline.id,
@@ -122,7 +193,14 @@ export class JenkinsService {
             message: jobData.logs,
             status: job.status,
           });
+          console.log(`[JenkinsService] Logs indexed for job: ${job.id}`);
         }
+      } catch (error) {
+        console.error(
+          `[JenkinsService] Error creating job/indexing logs for ${jobData.name}:`,
+          error,
+        );
+        // Continue to next job, don't fail the entire request
       }
     }
 
@@ -382,5 +460,56 @@ export class JenkinsService {
       console.error(error);
       throw error;
     }
+  }
+
+  /**
+   * Helper: Extract stages from Jenkins logs
+   * Matches pattern: [Pipeline] { (Stage Name)
+   */
+  private extractStagesFromLogs(
+    logs: string,
+  ): { name: string; logs: string }[] {
+    const stages: { name: string; logs: string }[] = [];
+    if (!logs) return stages;
+
+    const lines = logs.split('\n');
+    let currentStage: { name: string; logs: string[] } | null = null;
+
+    // Regex for standard Declarative Pipeline logs
+    // Example: [Pipeline] { (Build)
+    const stageStartRegex = /\[Pipeline\]\s+\{\s+\((.+?)\)/;
+
+    // Also look for Scripted Pipeline pattern if needed, or other variants
+    // But the payload likely has stripped ANSI, so we rely on text.
+
+    for (const line of lines) {
+      const match = line.match(stageStartRegex);
+      if (match) {
+        // Found a new stage start
+        if (currentStage) {
+          // Push previous stage
+          stages.push({
+            name: currentStage.name,
+            logs: currentStage.logs.join('\n'),
+          });
+        }
+        // Start new stage (capture group 1 is the stage name)
+        currentStage = { name: match[1], logs: [] };
+      } else {
+        if (currentStage) {
+          currentStage.logs.push(line);
+        }
+      }
+    }
+
+    // Push the last stage
+    if (currentStage) {
+      stages.push({
+        name: currentStage.name,
+        logs: currentStage.logs.join('\n'),
+      });
+    }
+
+    return stages;
   }
 }

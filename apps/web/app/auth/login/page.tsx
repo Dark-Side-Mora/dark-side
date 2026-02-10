@@ -196,7 +196,7 @@ export default function LoginPage() {
                   fontSize: "14px",
                 }}
               >
-                Sarah K.
+                Sithum W.
               </div>
               <div
                 style={{
@@ -204,7 +204,7 @@ export default function LoginPage() {
                   fontSize: "12px",
                 }}
               >
-                CTO, ScaleUp Inc.
+                CTO, Dark-Side Inc.
               </div>
             </div>
           </div>

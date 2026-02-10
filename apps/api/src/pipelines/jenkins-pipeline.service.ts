@@ -159,4 +159,78 @@ export class JenkinsPipelineService implements IPipelineProvider {
       },
     };
   }
+
+  async fetchWorkflowGraph(
+    userId: string,
+    projectName: string,
+    runId: string,
+  ): Promise<any> {
+    // Find the pipeline run by ID
+    const pipeline = await this.prisma.pipeline.findUnique({
+      where: { id: runId },
+      include: {
+        jobs: {
+          orderBy: { startedAt: 'asc' }, // Ensure jobs are ordered by start time
+        },
+        project: true,
+      },
+    });
+
+    if (!pipeline) {
+      throw new NotFoundException(`Pipeline run not found: ${runId}`);
+    }
+
+    const graph: Record<string, any> = {};
+    const executionOrder: string[] = [];
+
+    // Build graph nodes from jobs
+    // Jenkins jobs in our DB are linear, so we can chain them
+    pipeline.jobs.forEach((job, index) => {
+      const jobName = job.name;
+      executionOrder.push(jobName);
+
+      // Determine dependencies (previous job in the list)
+      const dependencies = index > 0 ? [pipeline.jobs[index - 1].name] : [];
+
+      graph[jobName] = {
+        id: job.id,
+        name: jobName,
+        status: job.status,
+        conclusion: job.status, // Jenkins status maps to conclusion
+        startedAt: job.startedAt?.toISOString(),
+        completedAt: job.finishedAt?.toISOString(),
+        dependencies,
+        steps: [], // Jenkins jobs don't granularly break down steps in our current model
+        type: 'job',
+      };
+    });
+
+    // Calculate total duration
+    const startTimes = pipeline.jobs
+      .filter((j) => j.startedAt)
+      .map((j) => j.startedAt!.getTime());
+    const endTimes = pipeline.jobs
+      .filter((j) => j.finishedAt)
+      .map((j) => j.finishedAt!.getTime());
+
+    const totalDuration =
+      startTimes.length > 0 && endTimes.length > 0
+        ? Math.max(...endTimes) - Math.min(...startTimes)
+        : 0;
+
+    return {
+      runId,
+      workflowName: pipeline.project.name,
+      branch: pipeline.branch,
+      status: pipeline.status,
+      conclusion: pipeline.status,
+      createdAt: pipeline.startedAt?.toISOString(),
+      updatedAt: pipeline.finishedAt?.toISOString(),
+      graph: {
+        jobs: graph,
+        executionOrder,
+        totalDuration,
+      },
+    };
+  }
 }
