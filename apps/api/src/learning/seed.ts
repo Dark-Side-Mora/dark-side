@@ -376,7 +376,7 @@ async function seedLearningData() {
         },
       });
       console.log(`  ✓ Quiz seeded: ${quiz.name}`);
-      for (const q of quiz.questions) {
+      for (const q of quiz.questions as any[]) {
         await prisma.quizQuestion.create({
           data: {
             quizId: createdQuiz.id,
