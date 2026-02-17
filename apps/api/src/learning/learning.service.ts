@@ -111,12 +111,47 @@ export class LearningService {
     };
   }
 
-  async getUserProgress(userId: string): Promise<UserProgressSummaryDto> {
+  async getUserProgress(
+    userId: string,
+  ): Promise<
+    UserProgressSummaryDto & {
+      rank: string;
+      nextRank: string;
+      pointsToNextRank: number;
+    }
+  > {
     const progress = await prisma.userQuizProgress.findMany({
       where: { userId },
       include: { question: { include: { quiz: true } } },
     });
     const totalMarks = progress.reduce((sum, p) => sum + p.mark, 0);
+
+    // Calculate Rank Dynamically
+    let rank = 'Novice';
+    let nextRank = 'Level 1 Engineer';
+    let pointsToNextRank = 100 - totalMarks;
+
+    if (totalMarks >= 1000) {
+      rank = 'DevSecOps Architect';
+      nextRank = 'Max Level';
+      pointsToNextRank = 0;
+    } else if (totalMarks >= 500) {
+      rank = 'Senior CI/CD Engineer';
+      nextRank = 'DevSecOps Architect';
+      pointsToNextRank = 1000 - totalMarks;
+    } else if (totalMarks >= 250) {
+      rank = 'Level 2 Engineer';
+      nextRank = 'Senior CI/CD Engineer';
+      pointsToNextRank = 500 - totalMarks;
+    } else if (totalMarks >= 100) {
+      rank = 'Level 1 Engineer';
+      nextRank = 'Level 2 Engineer';
+      pointsToNextRank = 250 - totalMarks;
+    } else {
+      // Novice
+      pointsToNextRank = 100 - totalMarks;
+    }
+
     const byCourse: Record<number, { marks: number; questions: number }> = {};
     const byQuiz: Record<number, { marks: number; questions: number }> = {};
     for (const p of progress) {
@@ -130,12 +165,15 @@ export class LearningService {
       byQuiz[quizId].questions += 1;
     }
     console.log(
-      `User ${userId} progress summary: totalQuestions=${progress.length}, totalMarks=${totalMarks}`,
+      `User ${userId} progress summary: totalQuestions=${progress.length}, totalMarks=${totalMarks}, rank=${rank}`,
     );
     return {
       userId,
       totalQuestions: progress.length,
       totalMarks,
+      rank,
+      nextRank,
+      pointsToNextRank: Math.max(0, pointsToNextRank),
       byCourse: Object.entries(byCourse).map(([courseModuleId, v]) => ({
         courseModuleId: +courseModuleId,
         ...v,
