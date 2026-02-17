@@ -56,7 +56,12 @@ export default function LearningPage() {
   return (
     <div
       className="learning-page-container"
-      style={{ padding: "32px", maxWidth: "1400px", margin: "0 auto" }}
+      style={{
+        padding: activeModuleId ? "0" : "32px",
+        maxWidth: activeModuleId ? "100%" : "1400px",
+        margin: "0 auto",
+        height: activeModuleId ? "calc(100vh - 64px)" : "auto", // Ensure full height for player
+      }}
     >
       {/* View: Course Player */}
       {activeModuleId && activeModule ? (
