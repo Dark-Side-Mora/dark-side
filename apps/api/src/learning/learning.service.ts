@@ -16,7 +16,11 @@ export class LearningService {
     const modules = await prisma.courseModule.findMany({
       orderBy: { order: 'asc' },
       include: {
-        quizzes: true,
+        quizzes: {
+          include: {
+            questions: true,
+          },
+        },
       },
     });
     return {
@@ -32,6 +36,16 @@ export class LearningService {
           name: q.name,
           description: q.description,
           difficulty: q.difficulty,
+          questions: q.questions.map((qn) => ({
+            id: qn.id,
+            type: qn.type,
+            question: qn.question,
+            choices: qn.choices,
+            points: qn.points,
+            workflowCode: qn.workflowCode || undefined,
+            hint: qn.hint || undefined,
+            correctIndex: qn.correctIndex, // Include for checking (or hide if secure mode needed, but MVP ok)
+          })),
         })),
       })),
     };
@@ -111,9 +125,7 @@ export class LearningService {
     };
   }
 
-  async getUserProgress(
-    userId: string,
-  ): Promise<
+  async getUserProgress(userId: string): Promise<
     UserProgressSummaryDto & {
       rank: string;
       nextRank: string;
