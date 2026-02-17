@@ -32,16 +32,16 @@ export const CoursePlayer: React.FC<CoursePlayerProps> = ({
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "300px 1fr",
-        height: "calc(100vh - 100px)", // Adjust based on header height
-        gap: "24px",
+        gridTemplateColumns: "280px 1fr",
+        height: "calc(100vh - 64px)", // Adjusted for standard header
+        width: "100%",
         overflow: "hidden",
       }}
     >
       {/* Sidebar Navigation */}
       <div
         style={{
-          background: "var(--bg-card)",
+          background: "var(--bg-card)", // Ensure this matches or is slightly distinct
           borderRight: "1px solid var(--border)",
           padding: "24px",
           display: "flex",
@@ -111,7 +111,14 @@ export const CoursePlayer: React.FC<CoursePlayerProps> = ({
       </div>
 
       {/* Main Content Area */}
-      <div style={{ padding: "24px", overflowY: "auto" }}>
+      <div
+        style={{
+          padding: "32px",
+          overflowY: "auto",
+          background:
+            "radial-gradient(circle at top right, rgba(6, 182, 212, 0.05), transparent 40%)",
+        }}
+      >
         {activeQuiz ? (
           <div>
             <div style={{ marginBottom: "32px", textAlign: "center" }}>
