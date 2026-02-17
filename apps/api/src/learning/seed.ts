@@ -274,6 +274,63 @@ const SAMPLE_QUIZZES = [
       },
     ],
   },
+  // Module 3
+  {
+    name: 'Caching Strategies',
+    description: 'Learn how to use caching to speed up your builds.',
+    difficulty: 'intermediate',
+    courseModuleOrder: 3,
+    questions: [
+      {
+        type: 'multiple-choice',
+        question:
+          'What is the most effective way to speed up dependency installation?',
+        choices: [
+          'Cache the node_modules directory',
+          'Download dependencies every time',
+          'Commit node_modules to git',
+          'Use a slower network connection',
+        ],
+        correctIndex: 0,
+        points: 10,
+      },
+      {
+        type: 'multiple-choice',
+        question: 'Which tool helps in caching build artifacts in monorepos?',
+        choices: ['Turborepo', 'Webpack', 'Babel', 'ESLint'],
+        correctIndex: 0,
+        points: 10,
+      },
+    ],
+  },
+  // Module 4
+  {
+    name: 'Observability Basics',
+    description: 'Understand the pillars of observability.',
+    difficulty: 'beginner',
+    courseModuleOrder: 4,
+    questions: [
+      {
+        type: 'multiple-choice',
+        question: 'Which of the following is NOT a pillar of observability?',
+        choices: ['Logs', 'Metrics', 'Traces', 'Documentation'],
+        correctIndex: 3,
+        points: 10,
+      },
+      {
+        type: 'multiple-choice',
+        question: 'What does MTTR stand for?',
+        choices: [
+          'Mean Time To Recovery',
+          'Maximum Time To Respond',
+          'Minimum Time To React',
+          'Mean Time To Retreat',
+        ],
+        correctIndex: 0,
+        points: 10,
+      },
+    ],
+  },
 ];
 
 /**
