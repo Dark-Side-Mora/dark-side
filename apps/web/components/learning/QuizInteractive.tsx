@@ -45,13 +45,14 @@ export const QuizInteractive: React.FC<QuizInteractiveProps> = ({
   const isLastQuestion = currentQuestionIndex === localQuestions.length - 1;
 
   const handleSelect = (index: number) => {
+    if (!currentQuestion) return;
     if (currentQuestion.isCorrect !== undefined) return; // Already answered
     setSelectedAnswer(index);
     setFeedback(null);
   };
 
   const handleCheck = async () => {
-    if (selectedAnswer === null) return;
+    if (!currentQuestion || selectedAnswer === null) return;
 
     setIsChecking(true);
     try {
