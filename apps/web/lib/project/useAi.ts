@@ -99,9 +99,8 @@ export function useAnalyzeLogs() {
       setAnalysisError(null);
       try {
         const data = await apiPost<any>(`${API_URL}/pipelines/analyze`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ logs, workflowFile }),
+          logs,
+          workflowFile,
         });
         setAnalysisData(data);
         return data;
