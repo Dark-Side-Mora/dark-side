@@ -105,6 +105,7 @@ export function useAnalyzeLogs() {
         // Extract the actual analysis data from the response wrapper
         const analysisResult = response?.data || response;
         setAnalysisData(analysisResult);
+        console.log("Analysis result:", analysisResult);
         return analysisResult;
       } catch (error) {
         const errorMsg =
