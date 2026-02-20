@@ -1,8 +1,10 @@
 import {
   Controller,
   Get,
+  Post,
   Query,
   Param,
+  Body,
   BadRequestException,
   HttpStatus,
   UseGuards,
@@ -10,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { GithubPipelineService } from './github/github-pipeline.service';
 import { JenkinsPipelineService } from './jenkins-pipeline.service';
+import { GeminiSecurityService } from '../ai/gemini/gemini-security.service';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -19,6 +22,7 @@ export class PipelinesController {
   constructor(
     private readonly githubPipelineService: GithubPipelineService,
     private readonly jenkinsPipelineService: JenkinsPipelineService,
+    private readonly geminiSecurityService: GeminiSecurityService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -51,6 +55,24 @@ export class PipelinesController {
         userId,
         decodedRepo,
       ),
+    };
+  }
+
+  @Post('analyze')
+  async analyzeLogs(@Body() body: { logs: string; workflowFile: string }) {
+    if (!body.logs || !body.workflowFile) {
+      throw new BadRequestException('Both logs and workflowFile are required');
+    }
+
+    const analysis = await this.geminiSecurityService.analyzeWorkflowLogs(
+      body.logs,
+      body.workflowFile,
+    );
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Workflow logs analyzed successfully',
+      data: analysis,
     };
   }
 }

@@ -30,3 +30,9 @@ export interface SecurityIssue {
   suggestedFix?: string; // Code snippet
   category: string; // e.g., "secrets", "permissions", "dependencies", "best-practices"
 }
+
+export interface LogsAnalysisResult {
+  summary: string;
+  reasons: string;
+  suggestedFixes: string;
+}

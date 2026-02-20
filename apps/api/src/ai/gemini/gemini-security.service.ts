@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import {
   IAIProvider,
+  LogsAnalysisResult,
   SecurityAnalysisResult,
   SecurityIssue,
 } from '../interfaces/ai-provider.interface';
@@ -307,6 +308,130 @@ Rules:
           impact: 'low',
         },
       ];
+    }
+  }
+
+  /**
+   * Analyze workflow and logs for issues and failures
+   */
+  async analyzeWorkflowLogs(
+    logs: string,
+    workflow_file: string,
+  ): Promise<LogsAnalysisResult> {
+    try {
+      const prompt = this.buildLogsAnalysisPrompt(logs, workflow_file);
+      const response = await this.model.generateContent(prompt);
+      const text = response.response.text();
+
+      // Parse JSON response from Gemini
+      const analysisData = this.parseLogsAnalysisResponse(text);
+
+      return {
+        summary: analysisData.summary,
+        reasons: analysisData.reasons || '',
+        suggestedFixes: analysisData.suggestedFixes || '',
+      };
+    } catch (error) {
+      console.error('Error analyzing workflow logs:', error);
+      throw new InternalServerErrorException(
+        `Failed to analyze workflow logs: ${error.message}`,
+      );
+    }
+  }
+
+  /**
+   * Build prompt for logs analysis
+   */
+  private buildLogsAnalysisPrompt(logs: string, workflowFile: string): string {
+    return `You are a CI/CD expert analyzing workflow execution logs and configuration. Provide a concise analysis of what happened, why failures occurred (if any), and actionable fixes.
+
+WORKFLOW FILE:
+\`\`\`yaml
+${workflowFile}
+\`\`\`
+
+EXECUTION LOGS:
+\`\`\`
+${logs}
+\`\`\`
+
+Analyze the logs and workflow file and provide your response in the following JSON format ONLY (no markdown, just valid JSON):
+{
+  "summary": "Brief overview of what the workflow did and its current status",
+  "reasons": "Explanation of any failures or issues encountered. Empty string if successful.",
+  "suggestedFixes": "Specific actionable steps to resolve identified issues. Empty string if no issues found."
+}
+
+Focus on:
+1. Build/test failures and their root causes
+2. Performance bottlenecks
+3. Configuration issues
+4. Missing dependencies or permissions
+5. Environment-related problems
+6. Step execution order issues
+
+Return ONLY valid JSON, no additional text.`;
+  }
+
+  /**
+   * Parse logs analysis response from Gemini
+   */
+  private parseLogsAnalysisResponse(text: string): {
+    summary: string;
+    reasons?: string;
+    suggestedFixes?: string;
+  } {
+    try {
+      // Try to extract JSON from the response
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No JSON found in response');
+      }
+
+      let jsonText = jsonMatch[0];
+
+      try {
+        // First attempt: try parsing as-is
+        const parsed = JSON.parse(jsonText);
+
+        // Validate response structure
+        if (!parsed.summary) {
+          throw new Error('Missing summary field');
+        }
+
+        return {
+          summary: parsed.summary,
+          reasons: parsed.reasons,
+          suggestedFixes: parsed.suggestedFixes,
+        };
+      } catch (parseError) {
+        // Second attempt: fix common escaping issues
+        jsonText = jsonText.replace(/\\"/g, '"');
+        jsonText = jsonText.replace(/\\n/g, ' ');
+        jsonText = jsonText.replace(/[\x00-\x1F\x7F]/g, ' ');
+
+        const parsed = JSON.parse(jsonText);
+
+        // Validate response structure
+        if (!parsed.summary) {
+          throw new Error('Missing summary field');
+        }
+
+        return {
+          summary: parsed.summary,
+          reasons: parsed.reasons,
+          suggestedFixes: parsed.suggestedFixes,
+        };
+      }
+    } catch (error) {
+      console.error('Error parsing logs analysis response:', error);
+      // Return default response if parsing fails
+      return {
+        summary:
+          'Analysis could not be completed. Please review the logs manually.',
+        reasons: 'Failed to parse AI response',
+        suggestedFixes: 'Check the workflow logs and configuration manually',
+      };
     }
   }
 }

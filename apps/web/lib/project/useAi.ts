@@ -98,69 +98,21 @@ export function useAnalyzeLogs() {
       setAnalysisLoading(true);
       setAnalysisError(null);
       try {
-        const prompt = `Analyze these CI/CD logs and workflow file. Provide the response in JSON format with these fields:
-{
-  "summary": "brief summary of what happened",
-  "reasons": "reasons why it failed (if applicable)",
-  "suggestedFixes": "suggested fixes to resolve the issues (if applicable)"
-}
-
-Logs:
-${logs}
-
-Workflow File:
-${workflowFile}`;
-
-        return new Promise((resolve, reject) => {
-          const callbackName = `callback_${Date.now()}`;
-
-          const script = document.createElement("script");
-          script.src = `https://script.google.com/macros/s/AKfycbz9rda1CigkmnqI7007oq-RI-mHKDVc1lizJ7evLdCGlr2ML1GHuJU-bAO0y67isiy03A/exec?action=askFromGemini&callback=${callbackName}`;
-          script.onerror = () => {
-            setAnalysisError("Failed to load analysis");
-            setAnalysisLoading(false);
-            reject(new Error("JSONP request failed"));
-          };
-
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (window as any)[callbackName] = (data: any) => {
-            const analysisResult = data?.content
-              ? typeof data.content === "string"
-                ? JSON.parse(data.content)
-                : data.content
-              : data;
-            setAnalysisData(analysisResult);
-            setAnalysisLoading(false);
-            document.body.removeChild(script);
-            delete (window as any)[callbackName];
-            resolve(analysisResult);
-          };
-
-          document.body.appendChild(script);
-
-          // Send prompt separately via FormData to avoid long URLs
-          const formData = new FormData();
-          formData.append("action", "askFromGemini");
-          formData.append("prompt", prompt);
-
-          fetch(
-            `https://script.google.com/macros/s/AKfycbz9rda1CigkmnqI7007oq-RI-mHKDVc1lizJ7evLdCGlr2ML1GHuJU-bAO0y67isiy03A/exec?callback=${callbackName}`,
-            {
-              method: "POST",
-              body: formData,
-            },
-          ).catch((err) =>
-            console.log("Form data sent (response ignored for JSONP):", err),
-          );
+        const data = await apiGet<any>(`${API_URL}/pipelines/analyze`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ logs, workflowFile }),
         });
+        setAnalysisData(data);
+        return data;
       } catch (error) {
         const errorMsg =
           error instanceof Error ? error.message : "Failed to analyze logs";
         setAnalysisError(errorMsg);
         setAnalysisData({ error: errorMsg });
-        console.error("[useAnalyzeLogs] Error:", errorMsg);
-        setAnalysisLoading(false);
         throw error;
+      } finally {
+        setAnalysisLoading(false);
       }
     },
     [],
