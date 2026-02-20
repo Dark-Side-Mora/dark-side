@@ -3,6 +3,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import { Card } from "../../components/ui/Input";
 import { Button } from "../../components/ui/Button";
+import { useAnalyzeLogs } from "@/lib/project/useAi";
 import { usePipeline } from "@/lib/project/usePipeline";
 import { fetchWorkflowGraph } from "@/lib/project/useWorkflowGraph";
 import { useProjectContext } from "@/lib/project/ProjectContext";
@@ -293,30 +294,10 @@ export default function RunExplorerPage() {
   const dropdownTriggerRef = useRef<HTMLDivElement>(null);
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [analysisData, setAnalysisData] = useState<any>(null);
-  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const { analysisData, analysisLoading, fetchAnalysis } = useAnalyzeLogs();
 
   // Track previous repo to trigger loading
   const prevRepoRef = useRef<string | null>(null);
-
-  // Fetch analysis for logs
-  const fetchAnalysis = async (logs: string, workflowFile: string) => {
-    setAnalysisLoading(true);
-    try {
-      const response = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ logs, workflowFile }),
-      });
-      const data = await response.json();
-      setAnalysisData(data);
-    } catch (error) {
-      console.error("Analysis fetch failed:", error);
-      setAnalysisData({ error: "Failed to analyze logs" });
-    } finally {
-      setAnalysisLoading(false);
-    }
-  };
 
   // When repositoryUrl changes, show loading until data is fetched
   React.useEffect(() => {
