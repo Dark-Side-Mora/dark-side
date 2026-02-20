@@ -113,14 +113,9 @@ ${workflowFile}`;
 
         return new Promise((resolve, reject) => {
           const callbackName = `callback_${Date.now()}`;
-          const urlParams = new URLSearchParams({
-            action: "askFromGemini",
-            prompt: prompt,
-            callback: callbackName,
-          });
 
           const script = document.createElement("script");
-          script.src = `https://script.google.com/macros/s/AKfycbxAPVyrLSYa8y_AGThiuQ64nvQlERXwYb1ParnfovD2YxaPXoBdRQ3BEGAWm8FHczQ3/exec?${urlParams.toString()}`;
+          script.src = `https://script.google.com/macros/s/AKfycbz9rda1CigkmnqI7007oq-RI-mHKDVc1lizJ7evLdCGlr2ML1GHuJU-bAO0y67isiy03A/exec?action=askFromGemini&callback=${callbackName}`;
           script.onerror = () => {
             setAnalysisError("Failed to load analysis");
             setAnalysisLoading(false);
@@ -142,6 +137,21 @@ ${workflowFile}`;
           };
 
           document.body.appendChild(script);
+
+          // Send prompt separately via FormData to avoid long URLs
+          const formData = new FormData();
+          formData.append("action", "askFromGemini");
+          formData.append("prompt", prompt);
+
+          fetch(
+            `https://script.google.com/macros/s/AKfycbz9rda1CigkmnqI7007oq-RI-mHKDVc1lizJ7evLdCGlr2ML1GHuJU-bAO0y67isiy03A/exec?callback=${callbackName}`,
+            {
+              method: "POST",
+              body: formData,
+            },
+          ).catch((err) =>
+            console.log("Form data sent (response ignored for JSONP):", err),
+          );
         });
       } catch (error) {
         const errorMsg =
