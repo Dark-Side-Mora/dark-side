@@ -293,9 +293,30 @@ export default function RunExplorerPage() {
   const dropdownTriggerRef = useRef<HTMLDivElement>(null);
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [analysisData, setAnalysisData] = useState<any>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
 
   // Track previous repo to trigger loading
   const prevRepoRef = useRef<string | null>(null);
+
+  // Fetch analysis for logs
+  const fetchAnalysis = async (logs: string, workflowFile: string) => {
+    setAnalysisLoading(true);
+    try {
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ logs, workflowFile }),
+      });
+      const data = await response.json();
+      setAnalysisData(data);
+    } catch (error) {
+      console.error("Analysis fetch failed:", error);
+      setAnalysisData({ error: "Failed to analyze logs" });
+    } finally {
+      setAnalysisLoading(false);
+    }
+  };
 
   // When repositoryUrl changes, show loading until data is fetched
   React.useEffect(() => {
@@ -1308,10 +1329,54 @@ export default function RunExplorerPage() {
                                   ? "var(--error)"
                                   : "var(--accent-cyan)",
                             marginBottom: "16px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
                           }}
                         >
-                          [STEP: {run.status?.toUpperCase()}]{" "}
-                          {run.commitMessage || run.commitSha}
+                          <span>
+                            [STEP: {run.status?.toUpperCase()}]{" "}
+                            {run.commitMessage || run.commitSha}
+                          </span>
+                          <button
+                            onClick={() => {
+                              const run = pipelineData?.workflows
+                                ?.flatMap((w) => w.recentRuns)
+                                .find((r) => r.id === selectedRunId);
+                              const workflow = pipelineData?.workflows?.find(
+                                (w) =>
+                                  w.recentRuns.some(
+                                    (r) => r.id === selectedRunId,
+                                  ),
+                              );
+                              if (run && workflow) {
+                                const allLogs =
+                                  run.jobs
+                                    ?.map((j) => `[${j.name}]\n${j.logs || ""}`)
+                                    .join("\n\n") || "";
+                                fetchAnalysis(allLogs, workflow.content || "");
+                              }
+                            }}
+                            style={{
+                              padding: "6px 12px",
+                              fontSize: "12px",
+                              fontWeight: 600,
+                              backgroundColor: "var(--accent-cyan)",
+                              color: "#000",
+                              border: "none",
+                              borderRadius: "6px",
+                              cursor: "pointer",
+                              transition: "opacity 0.2s ease",
+                            }}
+                            onMouseEnter={(e) =>
+                              (e.currentTarget.style.opacity = "0.8")
+                            }
+                            onMouseLeave={(e) =>
+                              (e.currentTarget.style.opacity = "1")
+                            }
+                          >
+                            {analysisLoading ? "Analyzing..." : "Analyze"}
+                          </button>
                         </div>
                         <div
                           style={{
@@ -1399,6 +1464,77 @@ export default function RunExplorerPage() {
                                 )}
                               </div>
                             ))}
+                          </div>
+                        )}
+                        {analysisData && (
+                          <div
+                            style={{
+                              marginTop: "24px",
+                              paddingTop: "24px",
+                              borderTop: "1px solid var(--border)",
+                              backgroundColor: "rgba(6, 182, 212, 0.05)",
+                              padding: "16px",
+                              borderRadius: "8px",
+                            }}
+                          >
+                            <div
+                              style={{
+                                color: "var(--accent-cyan)",
+                                fontWeight: 700,
+                                marginBottom: "12px",
+                              }}
+                            >
+                              Analysis Results:
+                            </div>
+                            {analysisLoading ? (
+                              <div style={{ color: "var(--text-secondary)" }}>
+                                Analyzing...
+                              </div>
+                            ) : analysisData.error ? (
+                              <div style={{ color: "var(--error)" }}>
+                                {analysisData.error}
+                              </div>
+                            ) : (
+                              <>
+                                <div style={{ marginBottom: "12px" }}>
+                                  <strong>Summary:</strong>
+                                  <div
+                                    style={{
+                                      color: "var(--text-secondary)",
+                                      marginTop: "4px",
+                                    }}
+                                  >
+                                    {analysisData.summary}
+                                  </div>
+                                </div>
+                                {analysisData.reasons && (
+                                  <div style={{ marginBottom: "12px" }}>
+                                    <strong>Reasons for Fails:</strong>
+                                    <div
+                                      style={{
+                                        color: "var(--text-secondary)",
+                                        marginTop: "4px",
+                                      }}
+                                    >
+                                      {analysisData.reasons}
+                                    </div>
+                                  </div>
+                                )}
+                                {analysisData.suggestedFixes && (
+                                  <div>
+                                    <strong>Suggested Fixes:</strong>
+                                    <div
+                                      style={{
+                                        color: "var(--text-secondary)",
+                                        marginTop: "4px",
+                                      }}
+                                    >
+                                      {analysisData.suggestedFixes}
+                                    </div>
+                                  </div>
+                                )}
+                              </>
+                            )}
                           </div>
                         )}
                       </>
