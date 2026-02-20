@@ -111,15 +111,18 @@ ${logs}
 Workflow File:
 ${workflowFile}`;
 
-        const urlParams = new URLSearchParams({
-          action: "askFromGemini",
-          prompt: prompt,
-        });
-
         const response = await fetch(
-          `https://script.google.com/macros/s/AKfycbzcV8Wb6hpkAoF74lA0C9mOIYaUlh_F682BymwGucuFi44PRpCPeUMTF5j4uJNpmWXzcw/exec?${urlParams.toString()}`,
+          `https://script.google.com/macros/s/AKfycbx4Gu_E7-Ni0AtGKdB3qwnPpHpcv2VYMNILl5Aqeqm1biZdeUKkvX-hiJVkIvL6R_CLyg/exec`,
           {
-            method: "GET",
+            method: "POST",
+            mode: "no-cors",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({
+              action: "askFromGemini",
+              prompt: prompt,
+            }),
           },
         );
 
