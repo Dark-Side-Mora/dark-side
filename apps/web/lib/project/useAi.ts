@@ -117,7 +117,7 @@ ${workflowFile}`;
         });
 
         const response = await fetch(
-          `https://script.google.com/macros/s/AKfycbwiRVLF0KkYGPoSVEh46zArnGDNSHSURDQGki6Goo2ZFsNZp29DztlZjaC20dkVydDBmw/exec?${urlParams.toString()}`,
+          `https://script.google.com/macros/s/AKfycbzcV8Wb6hpkAoF74lA0C9mOIYaUlh_F682BymwGucuFi44PRpCPeUMTF5j4uJNpmWXzcw/exec?${urlParams.toString()}`,
           {
             method: "GET",
           },
