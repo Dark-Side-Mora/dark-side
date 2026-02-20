@@ -98,12 +98,14 @@ export function useAnalyzeLogs() {
       setAnalysisLoading(true);
       setAnalysisError(null);
       try {
-        const data = await apiPost<any>(`${API_URL}/pipelines/analyze`, {
+        const response = await apiPost<any>(`${API_URL}/pipelines/analyze`, {
           logs,
           workflowFile,
         });
-        setAnalysisData(data);
-        return data;
+        // Extract the actual analysis data from the response wrapper
+        const analysisResult = response?.data || response;
+        setAnalysisData(analysisResult);
+        return analysisResult;
       } catch (error) {
         const errorMsg =
           error instanceof Error ? error.message : "Failed to analyze logs";
