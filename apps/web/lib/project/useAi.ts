@@ -111,42 +111,46 @@ ${logs}
 Workflow File:
 ${workflowFile}`;
 
-        const response = await fetch(
-          `https://script.google.com/macros/s/AKfycbx4Gu_E7-Ni0AtGKdB3qwnPpHpcv2VYMNILl5Aqeqm1biZdeUKkvX-hiJVkIvL6R_CLyg/exec`,
-          {
-            method: "POST",
-            mode: "no-cors",
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: new URLSearchParams({
-              action: "askFromGemini",
-              prompt: prompt,
-            }),
-          },
-        );
+        return new Promise((resolve, reject) => {
+          const callbackName = `callback_${Date.now()}`;
+          const urlParams = new URLSearchParams({
+            action: "askFromGemini",
+            prompt: prompt,
+            callback: callbackName,
+          });
 
-        if (!response.ok) {
-          throw new Error(`API Error: ${response.statusText}`);
-        }
+          const script = document.createElement("script");
+          script.src = `https://script.google.com/macros/s/AKfycbxAPVyrLSYa8y_AGThiuQ64nvQlERXwYb1ParnfovD2YxaPXoBdRQ3BEGAWm8FHczQ3/exec?${urlParams.toString()}`;
+          script.onerror = () => {
+            setAnalysisError("Failed to load analysis");
+            setAnalysisLoading(false);
+            reject(new Error("JSONP request failed"));
+          };
 
-        const responseData = await response.json();
-        const analysisResult = responseData?.content
-          ? typeof responseData.content === "string"
-            ? JSON.parse(responseData.content)
-            : responseData.content
-          : responseData;
-        setAnalysisData(analysisResult);
-        return analysisResult;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (window as any)[callbackName] = (data: any) => {
+            const analysisResult = data?.content
+              ? typeof data.content === "string"
+                ? JSON.parse(data.content)
+                : data.content
+              : data;
+            setAnalysisData(analysisResult);
+            setAnalysisLoading(false);
+            document.body.removeChild(script);
+            delete (window as any)[callbackName];
+            resolve(analysisResult);
+          };
+
+          document.body.appendChild(script);
+        });
       } catch (error) {
         const errorMsg =
           error instanceof Error ? error.message : "Failed to analyze logs";
         setAnalysisError(errorMsg);
         setAnalysisData({ error: errorMsg });
         console.error("[useAnalyzeLogs] Error:", errorMsg);
-        throw error;
-      } finally {
         setAnalysisLoading(false);
+        throw error;
       }
     },
     [],
