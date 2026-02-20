@@ -36,3 +36,9 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+
+/presentation
+
+*.tex
+*.txt
+PRESENTATION_APP_PLAN.md
