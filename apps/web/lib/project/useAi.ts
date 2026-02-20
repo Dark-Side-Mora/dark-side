@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { apiGet } from "../api/client";
+import { apiGet, apiPost } from "../api/client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -98,7 +98,7 @@ export function useAnalyzeLogs() {
       setAnalysisLoading(true);
       setAnalysisError(null);
       try {
-        const data = await apiGet<any>(`${API_URL}/pipelines/analyze`, {
+        const data = await apiPost<any>(`${API_URL}/pipelines/analyze`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ logs, workflowFile }),
