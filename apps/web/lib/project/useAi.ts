@@ -111,11 +111,15 @@ ${logs}
 Workflow File:
 ${workflowFile}`;
 
+        const urlParams = new URLSearchParams({
+          action: "askFromGemini",
+          prompt: prompt,
+        });
+
         const response = await fetch(
-          `https://script.google.com/macros/s/AKfycbwiRVLF0KkYGPoSVEh46zArnGDNSHSURDQGki6Goo2ZFsNZp29DztlZjaC20dkVydDBmw/exec?action=askFromGemini&prompt=${encodeURIComponent(prompt)}`,
+          `https://script.google.com/macros/s/AKfycbwiRVLF0KkYGPoSVEh46zArnGDNSHSURDQGki6Goo2ZFsNZp29DztlZjaC20dkVydDBmw/exec?${urlParams.toString()}`,
           {
             method: "GET",
-            headers: { "Content-Type": "application/json" },
           },
         );
 
@@ -123,15 +127,20 @@ ${workflowFile}`;
           throw new Error(`API Error: ${response.statusText}`);
         }
 
-        const content = JSON.parse(await response.text());
-        const data = content.content;
-        setAnalysisData(data);
-        return data;
+        const responseData = await response.json();
+        const analysisResult = responseData?.content
+          ? typeof responseData.content === "string"
+            ? JSON.parse(responseData.content)
+            : responseData.content
+          : responseData;
+        setAnalysisData(analysisResult);
+        return analysisResult;
       } catch (error) {
         const errorMsg =
           error instanceof Error ? error.message : "Failed to analyze logs";
         setAnalysisError(errorMsg);
         setAnalysisData({ error: errorMsg });
+        console.error("[useAnalyzeLogs] Error:", errorMsg);
         throw error;
       } finally {
         setAnalysisLoading(false);
