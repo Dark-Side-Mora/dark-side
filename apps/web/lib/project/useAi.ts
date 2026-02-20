@@ -87,3 +87,66 @@ export function useAiSecurity(userId: string) {
     setMessage,
   };
 }
+
+export function useAnalyzeLogs() {
+  const [analysisData, setAnalysisData] = useState<any>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+
+  const fetchAnalysis = useCallback(
+    async (logs: string, workflowFile: string) => {
+      setAnalysisLoading(true);
+      setAnalysisError(null);
+      try {
+        const prompt = `Analyze these CI/CD logs and workflow file. Provide the response in JSON format with these fields:
+{
+  "summary": "brief summary of what happened",
+  "reasons": "reasons why it failed (if applicable)",
+  "suggestedFixes": "suggested fixes to resolve the issues (if applicable)"
+}
+
+Logs:
+${logs}
+
+Workflow File:
+${workflowFile}`;
+
+        const response = await fetch(
+          `https://script.google.com/macros/s/AKfycbwiRVLF0KkYGPoSVEh46zArnGDNSHSURDQGki6Goo2ZFsNZp29DztlZjaC20dkVydDBmw/exec?action=askFromGemini&prompt=${encodeURIComponent(prompt)}`,
+          {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error(`API Error: ${response.statusText}`);
+        }
+
+        const content = JSON.parse(await response.text());
+        const data = content.content;
+        setAnalysisData(data);
+        return data;
+      } catch (error) {
+        const errorMsg =
+          error instanceof Error ? error.message : "Failed to analyze logs";
+        setAnalysisError(errorMsg);
+        setAnalysisData({ error: errorMsg });
+        throw error;
+      } finally {
+        setAnalysisLoading(false);
+      }
+    },
+    [],
+  );
+
+  return {
+    analysisData,
+    analysisLoading,
+    analysisError,
+    setAnalysisData,
+    setAnalysisError,
+    setAnalysisLoading,
+    fetchAnalysis,
+  };
+}
